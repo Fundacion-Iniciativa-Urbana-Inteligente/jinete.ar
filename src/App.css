@@ -1,0 +1,48 @@
+#root {
+  margin: 0 auto;
+  text-align: center;
+}
+.container{
+  margin-top: 70px;
+  min-height: 100vh;
+}
+.banner{
+  background: #2e2e2e;
+  height:100vh;
+  box-sizing: border-box;
+  padding-top: 30vh;
+  background-size: cover;
+  margin-bottom: 20px;
+  color:#f0f0f0;
+}
+#mapa, .leaflet-container{
+  margin-top:56px;
+  height:calc(100vh - 56px)
+}
+.bt-escaner {
+  cursor: pointer;
+  position: absolute;
+  left:50%;
+  bottom: 10px;
+  margin-left: -24px;
+  z-index: 400;
+}
+.leaflet-control-attribution{
+  display: none;
+}
+
+.profile-banner {
+  background: #80a5d4;
+  height: 30vh;
+}
+.profile {
+  background: #fff;
+  border-radius: 20px;
+  min-height: 80vh;
+  margin-top: calc(-30vh + 60px);
+  box-shadow: 0px 0px 5px #999;
+  padding: 30px;
+  .row+button{
+    margin-top: 20px;
+  }
+}
