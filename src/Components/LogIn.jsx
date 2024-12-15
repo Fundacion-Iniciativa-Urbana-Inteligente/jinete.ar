@@ -1,6 +1,6 @@
 import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { UserContext } from '../context/UserContext'; // Importar contexto del usuario
+import { UserContext } from '../Context/UserContext'; // Importar contexto del usuario
 
 const Login = () => {
   const [formState, setFormState] = useState({

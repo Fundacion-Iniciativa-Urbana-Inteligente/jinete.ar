@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { MapContainer, Marker, Popup, TileLayer } from "react-leaflet";
 import { useLocation } from "../Context/LocationContext";
-import UnlockDevice from "../components/UnlockDevice"; // Asegúrate de que la ruta sea correcta
+import UnlockDevice from "../Components/UnlockDevice"; // Asegúrate de que la ruta sea correcta
 
 const posadas = [-27.366666666667, -55.893]; // Coordenadas iniciales de Posadas
 
