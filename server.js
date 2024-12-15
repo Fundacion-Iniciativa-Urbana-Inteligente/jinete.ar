@@ -8,7 +8,7 @@ import cors from 'cors';
 import twilio from 'twilio';
 import jwt from 'jsonwebtoken';
 import Joi from 'joi';
-import User from './models/User.js';
+import User from './models/user.js';
 
 // Llama al archivo .env
 dotenv.config();
