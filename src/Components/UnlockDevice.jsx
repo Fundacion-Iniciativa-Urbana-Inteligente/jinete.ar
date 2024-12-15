@@ -1,127 +1,128 @@
 import React, { useState } from "react";
 import axios from "axios";
-import QrScanner from "react-qr-scanner";
-import { useQR } from "../Context/QRContext";
+import { useLocation } from "../Context/LocationContext"; // Importar el contexto
 
-const UnlockDevice = ({ accessToken }) => {
-  const { setIsUnlocking } = useQR(); // Para volver al estado inicial
+const UnlockDevice = () => {
+  const { accessToken, deviceLocation } = useLocation(); // Obtener accessToken y deviceLocation desde el contexto
+  const [imei, setImei] = useState(""); // Estado para almacenar el IMEI ingresado
   const [responseMessage, setResponseMessage] = useState("");
   const [error, setError] = useState(null);
-  const [isScanning, setIsScanning] = useState(false); // Control del escaneo
-  const [isProcessing, setIsProcessing] = useState(false); // Indicador de procesamiento
+  const [isProcessing, setIsProcessing] = useState(false); // Estado para indicar si se está procesando
+  const [success, setSuccess] = useState(false); // Indica si la acción fue exitosa
 
-  // Logs para depuración
-  console.log("Estado de isScanning:", isScanning);
-  console.log("Estado de isProcessing:", isProcessing);
-
-  const handleScan = async (data) => {
-    if (!data) return;
-
-    const imei = data.text.trim();
-    console.log("IMEI escaneado:", imei);
-
-    setIsScanning(false);
+  const handleUnlock = async () => {
+    setError(null); // Reiniciar errores
+    setSuccess(false); // Reiniciar el estado de éxito
 
     if (!imei) {
-      setError("El código QR no contiene un IMEI válido.");
+      setError("Por favor, ingresa un IMEI válido.");
+      return;
+    }
+
+    if (!accessToken) {
+      setError("El token de acceso no está disponible. Por favor, inicia sesión nuevamente.");
       return;
     }
 
     try {
+      // Mostrar estado de procesamiento
       setIsProcessing(true);
+
+      // Configuración del payload
       const endpoint = "https://us-open.tracksolidpro.com/route/rest";
       const appKey = "8FB345B8693CCD00A85859F91CC77D2A339A22A4105B6558";
       const timestamp = new Date().toISOString().replace("T", " ").split(".")[0];
+      const signature = "123456"; // Implementar lógica de firma si es necesario
 
+      // Actualización del inst_param_json
       const instParamJson = {
-        inst_id: "416",
+        inst_id: "416", // ID para el comando OPEN
         inst_template: "OPEN#",
-        params: [],
+        params: [], // No se requieren parámetros adicionales
         is_cover: "true",
       };
-
-      console.log("inst_param_json generado:", JSON.stringify(instParamJson));
 
       const payload = {
         method: "jimi.open.instruction.send",
         timestamp,
         app_key: appKey,
-        sign: "123456",
+        sign: signature,
         sign_method: "md5",
         v: "0.9",
         format: "json",
         access_token: accessToken,
         imei,
-        inst_param_json: JSON.stringify(instParamJson),
+        inst_param_json: JSON.stringify(instParamJson), // Se usa el JSON actualizado
       };
 
-      console.log("Payload enviado a la API:", payload);
-
+      // Enviar la solicitud POST
       const response = await axios.post(endpoint, payload, {
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
       });
 
-      console.log("Respuesta de la API:", response.data);
+      // Manejo de respuesta
+      if (response.data && response.data.code === 0) {
+        const result = response.data.result;
 
-      const { code, result } = response.data;
-
-      if (code === 0) {
         if (result.includes("OPEN set OK")) {
-          setResponseMessage("El candado se ha abierto correctamente.");
-        } else if (result.includes("already in open status")) {
+          setSuccess(true); // Acción exitosa
+          setResponseMessage("Candado abierto correctamente.");
+        } else if (result.includes("OPEN command is not executed")) {
+          setSuccess(true); // No hay error pero el candado ya estaba abierto
           setResponseMessage("El candado ya está abierto.");
         } else {
-          setResponseMessage("Orden enviada con éxito, revisa el estado del candado.");
+          throw new Error("Respuesta desconocida del servidor.");
         }
-        setError(null);
       } else {
-        setError("Error al enviar la orden de desbloqueo.");
+        throw new Error(response.data.message || "Error desconocido al desbloquear.");
       }
     } catch (err) {
+      setError(err.message || "Error al enviar la instrucción UNLOCK.");
       console.error("Error al desbloquear el dispositivo:", err);
-      setError("Error al enviar la instrucción UNLOCK.");
     } finally {
-      setIsProcessing(false);
+      setIsProcessing(false); // Finalizar el estado de procesamiento
     }
   };
 
-  const handleError = (err) => {
-    console.error("Error al escanear el código QR:", err);
-    setError("Error al escanear el código QR. Intenta nuevamente.");
-    setIsScanning(false);
-  };
-
   return (
-    <div>
-      <h2>Desbloquear Dispositivo</h2>
-      {isScanning ? (
-        <div>
-          <QrScanner
-            delay={300}
-            style={{ width: "100%" }}
-            onScan={handleScan}
-            onError={handleError}
-          />
-          <button onClick={() => setIsScanning(false)}>Cancelar</button>
-        </div>
-      ) : (
-        <div>
-          <button
-            onClick={() => {
-              console.log("Abrir cámara"); // Log para confirmar el clic
-              setIsScanning(true);
-            }}
-            disabled={isProcessing}
-          >
-            {isProcessing ? "Procesando..." : "Escanear QR"}
-          </button>
-          <button onClick={() => setIsUnlocking(false)} disabled={isProcessing}>
-            Volver
-          </button>
-        </div>
+    <div style={{ textAlign: "center" }}>
+      <h2>Desbloquear Bicicleta</h2>
+      <input
+        type="text"
+        placeholder="Ingresa el IMEI"
+        value={imei}
+        onChange={(e) => setImei(e.target.value)}
+        style={{
+          marginBottom: "10px",
+          padding: "10px",
+          width: "80%",
+          borderRadius: "5px",
+          border: "1px solid #ccc",
+        }}
+      />
+      <br />
+      <button
+        onClick={handleUnlock}
+        disabled={isProcessing}
+        style={{
+          backgroundColor: isProcessing ? "#ccc" : "#4CAF50",
+          color: "white",
+          border: "none",
+          borderRadius: "5px",
+          padding: "10px 20px",
+          cursor: isProcessing ? "not-allowed" : "pointer",
+        }}
+      >
+        {isProcessing ? "Procesando..." : "Abrir Candado"}
+      </button>
+
+      {/* Mensaje de respuesta */}
+      {responseMessage && success && (
+        <p style={{ color: "green", marginTop: "20px" }}>{responseMessage}</p>
       )}
-      {responseMessage && <p style={{ color: "green" }}>{responseMessage}</p>}
-      {error && <p style={{ color: "red" }}>{error}</p>}
+
+      {/* Mensaje de error */}
+      {error && <p style={{ color: "red", marginTop: "20px" }}>Error: {error}</p>}
     </div>
   );
 };

@@ -1,23 +1,13 @@
-import { useQR } from "../Context/QRContext";
+import React from "react";
 
-export default function MapButton() {
-  const { setIsUnlocking } = useQR(); // Obtiene la función desde el contexto
-
-  // Log para verificar que setIsUnlocking se pasa correctamente
-  console.log("setIsUnlocking en MapButton:", setIsUnlocking);
-
+export default function MapButton({ onClick }) {
   return (
     <div className="bt-escaner">
       <button
         className="btn btn-light escaner"
         onClick={() => {
-          console.log("Botón presionado"); // Log para confirmar que el botón fue clickeado
-          if (typeof setIsUnlocking === "function") {
-            setIsUnlocking(true); // Cambia el estado en el contexto
-            console.log("Estado cambiado a desbloqueo activo"); // Log para confirmar la ejecución
-          } else {
-            console.error("setIsUnlocking no está definido o no es una función"); // Error si el contexto no está configurado
-          }
+          console.log("Botón QR presionado en MapButton");
+          onClick(); // Llama a la función pasada como prop
         }}
       >
         <img src="/qr_code.svg" height={35} alt="Escanear QR" />
