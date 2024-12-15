@@ -58,7 +58,7 @@ const validateUserInput = (data) => {
 
 // Rutas Públicas
 app.get('/', (req, res) => {
-  res.send('Bienvenido a la API de Jineteando');
+  res.send('Bienvenido a la API de Jinete.ar');
 });
 
 // Registro de Usuario (Sign Up)
@@ -174,6 +174,37 @@ app.post('/reset-password', async (req, res) => {
     res.status(500).json({ error: 'Error al restablecer contraseña' });
   }
 });
+
+// Consultar todos los usuarios
+app.get('/users', async (req, res) => {
+  try {
+    // Encuentra todos los usuarios en la colección "users"
+    const users = await User.find(); // User es el modelo de usuario importado
+    res.status(200).json(users); // Devuelve los usuarios en formato JSON
+  } catch (err) {
+    console.error('Error al obtener los usuarios:', err);
+    res.status(500).json({ message: 'Error al obtener los usuarios.' });
+  }
+});
+
+// Eliminar un usuario por ID
+app.delete('/users/:id', async (req, res) => {
+  const { id } = req.params; // Obtén el ID del usuario de los parámetros de la URL
+  try {
+    // Busca y elimina el usuario en la colección "users"
+    const deletedUser = await User.findByIdAndDelete(id);
+    
+    if (!deletedUser) {
+      return res.status(404).json({ message: 'Usuario no encontrado.' });
+    }
+
+    res.status(200).json({ message: 'Usuario eliminado exitosamente.', user: deletedUser });
+  } catch (err) {
+    console.error('Error al eliminar usuario:', err);
+    res.status(500).json({ message: 'Error al eliminar el usuario.' });
+  }
+});
+
 
 // Inicio del Servidor
 app.listen(port, () => {
