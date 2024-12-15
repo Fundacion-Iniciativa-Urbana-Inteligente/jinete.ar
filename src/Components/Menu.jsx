@@ -1,6 +1,6 @@
 import React, { useContext, useEffect, useRef } from 'react';
 import { NavLink, useNavigate } from "react-router-dom";
-import { UserContext } from "../context/UserContext"; // Importar UserContext
+import { UserContext } from "../Context/UserContext"; // Importar UserContext
 
 const Menu = () => {
   const navbarToggler = useRef(null); // Referencia al botón de colapsar el menú
