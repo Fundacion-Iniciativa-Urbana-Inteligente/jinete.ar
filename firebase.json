@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "public": "public",  // Apunta a los archivos transpílicos
+    "public": "dist",  // Apunta a los archivos transpílicos
     "ignore": [
       "firebase.json",
       "**/.*",
