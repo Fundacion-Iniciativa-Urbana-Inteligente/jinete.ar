@@ -1,0 +1,5 @@
+export default function Movimientos() {
+  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("h3", null, "Movimientos:"), /*#__PURE__*/React.createElement("table", {
+    className: "table table-striped"
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("th", null, "Fecha:"), /*#__PURE__*/React.createElement("th", null, "Monto:")), /*#__PURE__*/React.createElement("tbody", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", null, "29/05/2024 -13:05"), /*#__PURE__*/React.createElement("td", null, "$420,00")), /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", null, "14/06/2024 -09:21"), /*#__PURE__*/React.createElement("td", null, "$351,00")))));
+}

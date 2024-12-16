@@ -14,7 +14,7 @@ RUN npm install
 COPY . .
 
 # Construir el frontend en modo producción
-RUN npm run dev
+RUN npm run build
 
 ---
 
