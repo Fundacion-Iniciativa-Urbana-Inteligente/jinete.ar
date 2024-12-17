@@ -10,10 +10,10 @@ import jwt from 'jsonwebtoken';
 import Joi from 'joi';
 import User from './models/user.js';
 
-// Llama al archivo .env
+// Configuración de variables de entorno
 dotenv.config();
 
-// Configura express
+// Configura Express
 const app = express();
 const port = process.env.PORT || 8080;
 
@@ -26,22 +26,29 @@ const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TO
 
 // Conexión a MongoDB
 mongoose
-  .connect(process.env.MONGODB_URI)
-  .then(() => console.log('Conectado a MongoDB'))
-  .catch((err) => console.error('Error al conectar a MongoDB:', err));
+  .connect(process.env.MONGODB_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  })
+  .then(() => console.log('✅ Conectado a MongoDB'))
+  .catch((err) => console.error('❌ Error al conectar a MongoDB:', err));
 
 mongoose.connection.on('disconnected', () => {
-  console.error('MongoDB desconectado. Intentando reconectar...');
+  console.error('⚠️ MongoDB desconectado. Intentando reconectar...');
 });
 
 // Middleware
-app.use(cors({ origin: 'http://localhost:5173', methods: 'GET,POST,PUT,PATCH,DELETE' }));
-app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(cors({
+  origin: ['https://jinete-ar.web.app', 'http://localhost:5173'], // Orígenes permitidos
+  methods: 'GET,POST,PUT,PATCH,DELETE',
+  credentials: true, // Permitir envío de cookies o cabeceras personalizadas
+}));
+app.use(express.json()); // Parsear JSON
+app.use(express.static(path.join(__dirname, 'public'))); // Servir archivos estáticos
 
 // Middleware global para manejar errores
 app.use((err, req, res, next) => {
-  console.error(err.stack);
+  console.error('❌ Error:', err.stack);
   res.status(500).json({ message: 'Ocurrió un error inesperado.' });
 });
 
@@ -56,12 +63,12 @@ const validateUserInput = (data) => {
   return schema.validate(data);
 };
 
-// Rutas Públicas
+// Rutas públicas
 app.get('/', (req, res) => {
-  res.send('Bienvenido a la API de Jinete.ar');
+  res.send('🌐 Bienvenido a la API de Jinete.ar');
 });
 
-// Registro de Usuario (Sign Up)
+// Registro de usuario
 app.post('/signup', async (req, res) => {
   const { error } = validateUserInput(req.body);
   if (error) {
@@ -69,6 +76,7 @@ app.post('/signup', async (req, res) => {
   }
 
   const { name, phone, email, password } = req.body;
+
   try {
     const existingUser = await User.findOne({ phone });
     if (existingUser) {
@@ -76,20 +84,20 @@ app.post('/signup', async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-
     const user = new User({ name, phone, email, password: hashedPassword });
     await user.save();
 
     res.status(201).json({ message: 'Usuario registrado exitosamente.' });
   } catch (err) {
     console.error('Error en el registro:', err);
-    res.status(500).json({ error: 'Error al registrar usuario' });
+    res.status(500).json({ message: 'Error al registrar usuario.' });
   }
 });
 
-// Inicio de Sesión (Login)
+// Inicio de sesión
 app.post('/login', async (req, res) => {
   const { phone, password } = req.body;
+
   try {
     const user = await User.findOne({ phone });
     if (!user) {
@@ -105,13 +113,14 @@ app.post('/login', async (req, res) => {
     res.status(200).json({ message: 'Inicio de sesión exitoso.', name: user.name, token });
   } catch (err) {
     console.error('Error al iniciar sesión:', err);
-    res.status(500).json({ error: 'Error al iniciar sesión' });
+    res.status(500).json({ message: 'Error al iniciar sesión.' });
   }
 });
 
-// Solicitar OTP para Recuperación de Contraseña
+// Solicitar OTP
 app.post('/forgot-password', async (req, res) => {
   const { phone } = req.body;
+
   try {
     const user = await User.findOne({ phone });
     if (!user) {
@@ -120,7 +129,7 @@ app.post('/forgot-password', async (req, res) => {
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     user.otp = otp;
-    user.otpExpires = Date.now() + 10 * 60 * 1000;
+    user.otpExpires = Date.now() + 10 * 60 * 1000; // 10 minutos
     await user.save();
 
     await client.messages.create({
@@ -132,13 +141,14 @@ app.post('/forgot-password', async (req, res) => {
     res.status(200).json({ message: 'OTP enviado. Revisa tu teléfono.' });
   } catch (err) {
     console.error('Error al enviar OTP:', err);
-    res.status(500).json({ error: 'Error al enviar OTP' });
+    res.status(500).json({ message: 'Error al enviar OTP.' });
   }
 });
 
 // Validar OTP
 app.post('/verify-otp', async (req, res) => {
   const { phone, otp } = req.body;
+
   try {
     const user = await User.findOne({ phone, otp, otpExpires: { $gt: Date.now() } });
     if (!user) {
@@ -149,16 +159,17 @@ app.post('/verify-otp', async (req, res) => {
     user.otpExpires = null;
     await user.save();
 
-    res.status(200).json({ message: 'OTP validado correctamente. Puedes restablecer tu contraseña.' });
+    res.status(200).json({ message: 'OTP validado correctamente.' });
   } catch (err) {
     console.error('Error al validar OTP:', err);
-    res.status(500).json({ error: 'Error al validar OTP' });
+    res.status(500).json({ message: 'Error al validar OTP.' });
   }
 });
 
-// Restablecer Contraseña
+// Restablecer contraseña
 app.post('/reset-password', async (req, res) => {
   const { phone, newPassword } = req.body;
+
   try {
     const user = await User.findOne({ phone });
     if (!user) {
@@ -171,42 +182,39 @@ app.post('/reset-password', async (req, res) => {
     res.status(200).json({ message: 'Contraseña restablecida exitosamente.' });
   } catch (err) {
     console.error('Error al restablecer contraseña:', err);
-    res.status(500).json({ error: 'Error al restablecer contraseña' });
+    res.status(500).json({ message: 'Error al restablecer contraseña.' });
   }
 });
 
-// Consultar todos los usuarios
+// Consultar usuarios
 app.get('/users', async (req, res) => {
   try {
-    // Encuentra todos los usuarios en la colección "users"
-    const users = await User.find(); // User es el modelo de usuario importado
-    res.status(200).json(users); // Devuelve los usuarios en formato JSON
+    const users = await User.find();
+    res.status(200).json(users);
   } catch (err) {
-    console.error('Error al obtener los usuarios:', err);
-    res.status(500).json({ message: 'Error al obtener los usuarios.' });
+    console.error('Error al obtener usuarios:', err);
+    res.status(500).json({ message: 'Error al obtener usuarios.' });
   }
 });
 
-// Eliminar un usuario por ID
+// Eliminar usuario
 app.delete('/users/:id', async (req, res) => {
-  const { id } = req.params; // Obtén el ID del usuario de los parámetros de la URL
+  const { id } = req.params;
+
   try {
-    // Busca y elimina el usuario en la colección "users"
-    const deletedUser = await User.findByIdAndDelete(id);
-    
-    if (!deletedUser) {
+    const user = await User.findByIdAndDelete(id);
+    if (!user) {
       return res.status(404).json({ message: 'Usuario no encontrado.' });
     }
 
-    res.status(200).json({ message: 'Usuario eliminado exitosamente.', user: deletedUser });
+    res.status(200).json({ message: 'Usuario eliminado exitosamente.' });
   } catch (err) {
     console.error('Error al eliminar usuario:', err);
-    res.status(500).json({ message: 'Error al eliminar el usuario.' });
+    res.status(500).json({ message: 'Error al eliminar usuario.' });
   }
 });
 
-
-// Inicio del Servidor
+// Iniciar servidor
 app.listen(port, () => {
-  console.log(`Servidor corriendo en http://localhost:${port}`);
+  console.log(`🚀 Servidor corriendo en http://localhost:${port}`);
 });
