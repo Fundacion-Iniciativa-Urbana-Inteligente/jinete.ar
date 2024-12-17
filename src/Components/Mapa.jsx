@@ -2,12 +2,14 @@ import React, { useState } from "react";
 import { MapContainer, Marker, Popup, TileLayer } from "react-leaflet";
 import { useLocation } from "../Context/LocationContext";
 import UnlockDevice from "../Components/UnlockDevice"; // Asegúrate de que la ruta sea correcta
+import { signInWithGoogle } from "../firebaseAuth"; // Importar función de autenticación
 
 const posadas = [-27.366666666667, -55.893]; // Coordenadas iniciales de Posadas
 
 export default function Mapa({ accessToken }) {
   const { deviceLocation } = useLocation(); // Obtén la ubicación desde el contexto
   const [showUnlock, setShowUnlock] = useState(false); // Estado para mostrar u ocultar UnlockDevice
+   // Loggeado con Auhorization de google
 
   // Función para mostrar el componente de desbloqueo
   const handleUnlockClick = () => {
@@ -41,7 +43,7 @@ export default function Mapa({ accessToken }) {
       </MapContainer>
 
       {/* Botón Desbloquear sobre el mapa */}
-      <button
+      {<button
         onClick={handleUnlockClick}
         style={{
           position: "absolute",
@@ -60,6 +62,7 @@ export default function Mapa({ accessToken }) {
       >
         Desbloquear Bicicleta
       </button>
+      }
 
       {/* Mostrar UnlockDevice cuando showUnlock es true */}
       {showUnlock && (
