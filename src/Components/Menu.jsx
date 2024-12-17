@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-import { signInWithGoogle } from "../firebaseAuth"; // Importar función de autenticación
+import { signInWithGoogle, logout } from "../firebaseAuth"; // Importar función de autenticación
 import "./menu.css";
+
 
 const Menu = () => {
   const navbarToggler = useRef(null);
@@ -36,11 +37,18 @@ const Menu = () => {
   };
   
   // Logout
-  const handleLogout = () => {
-    localStorage.removeItem("user");
-    setUser(null);
-    navigate("/");
-  };
+  const handleLogout = async () => {
+    try {
+      await logout(); // Llamar a la función logout de firebaseAuth.js
+      localStorage.removeItem("user"); // Borra el usuario del localStorage
+      setUser(null); // Actualiza el estado del usuario
+      console.log("Sesión cerrada exitosamente");
+      navigate("/"); // Redirige a la página principal
+    } catch (error) {
+      console.error("Error al cerrar sesión:", error.message);
+      alert("Hubo un error al cerrar la sesión. Intenta nuevamente.");
+    }
+  };  
 
   // Recuperar usuario almacenado en localStorage
   useEffect(() => {
@@ -76,7 +84,7 @@ const Menu = () => {
               </NavLink>
             </li>
             <li className="nav-item">
-              <NavLink className="nav-link" to="/help" onClick={closeMenu}>
+              <NavLink className="nav-link" to="/helpme" onClick={closeMenu}>
                 Así Funciona
               </NavLink>
             </li>

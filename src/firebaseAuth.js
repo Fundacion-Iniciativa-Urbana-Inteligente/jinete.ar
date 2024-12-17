@@ -5,7 +5,9 @@ import {
   RecaptchaVerifier,
   signInWithPopup,
   signInWithPhoneNumber,
+  signOut, // Importar signOut aquí
 } from "firebase/auth";
+
 
 // Proveedor de Google
 const googleProvider = new GoogleAuthProvider();
@@ -62,5 +64,16 @@ export const verifySMSCode = async (code) => {
   } catch (error) {
     console.error("Error al verificar código:", error.message);
     throw new Error("Código incorrecto o expirado.");
+  }
+};
+
+// Exportar la función signOut
+export const logout = async () => {
+  try {
+    await signOut(auth);
+    console.log("Sesión cerrada correctamente.");
+  } catch (error) {
+    console.error("Error al cerrar sesión:", error.message);
+    throw new Error("Error al cerrar sesión.");
   }
 };
