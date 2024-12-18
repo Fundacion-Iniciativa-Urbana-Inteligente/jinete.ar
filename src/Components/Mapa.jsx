@@ -1,99 +1,123 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { MapContainer, Marker, Popup, TileLayer } from "react-leaflet";
 import { useLocation } from "../Context/LocationContext";
-import UnlockDevice from "../Components/UnlockDevice"; // Asegúrate de que la ruta sea correcta
-import { signInWithGoogle } from "../firebaseAuth"; // Importar función de autenticación
+import UnlockDevice from "../Components/UnlockDevice";
+import { signInWithGoogle } from "../firebaseAuth";
 
-const posadas = [-27.366666666667, -55.893]; // Coordenadas iniciales de Posadas
+const posadas = [-27.366666666667, -55.893];
 
 export default function Mapa({ accessToken }) {
-  const { deviceLocation } = useLocation(); // Obtén la ubicación desde el contexto
-  const [showUnlock, setShowUnlock] = useState(false); // Estado para mostrar u ocultar UnlockDevice
-   // Loggeado con Auhorization de google
+  const { deviceLocation } = useLocation();
+  const [showUnlock, setShowUnlock] = useState(false);
 
-  // Función para mostrar el componente de desbloqueo
+  useEffect(() => {
+    console.log("Device Location Data:", deviceLocation);
+  }, [deviceLocation]);
+
   const handleUnlockClick = () => {
     setShowUnlock(true);
   };
 
-  // Función para cerrar el componente de desbloqueo
   const closeUnlock = () => {
     setShowUnlock(false);
   };
 
+  const formatCoordinates = (coord) => {
+    return coord.toFixed(6);
+  };
+
+  const getBatteryColor = (level) => {
+    if (level >= 70) return "#4CAF50";
+    if (level >= 30) return "#FFC107";
+    return "#F44336";
+  };
+
+  const getDeviceTitle = () => {
+    if (!deviceLocation) return "Bicicleta Sin ID";
+    const name = deviceLocation.deviceName || deviceLocation.device_name || deviceLocation.imei;
+    return `Bicicleta ${name || "Sin ID"}`;
+  };
+
   return (
-    <div style={{ position: "relative" }}>
-      {/* Contenedor del Mapa */}
+    <div id="mapa">
       <MapContainer
         center={deviceLocation ? [deviceLocation.latitude, deviceLocation.longitude] : posadas}
         zoom={15}
-        style={{ height: "100vh", width: "100%" }} // Asegura que el mapa ocupe el espacio esperado
+        zoomControl={true}
+        scrollWheelZoom={true}
+        doubleClickZoom={true}
+        minZoom={3}
+        maxZoom={18}
+        attributionControl={false}
       >
         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
         {deviceLocation &&
           deviceLocation.latitude !== undefined &&
           deviceLocation.longitude !== undefined && (
             <Marker position={[deviceLocation.latitude, deviceLocation.longitude]}>
-              <Popup>
-                Ubicación actual: <br />
-                Latitud: {deviceLocation.latitude}, Longitud: {deviceLocation.longitude}
+              <Popup className="custom-popup">
+                <div className="popup-header">
+                  <i className="bi bi-bicycle"></i>
+                  <h3>{getDeviceTitle()}</h3>
+                </div>
+                <div className="popup-content">
+                  <div className="info-row">
+                    <i className="bi bi-geo-alt"></i>
+                    <div>
+                      <strong>Ubicación:</strong><br />
+                      <span>{formatCoordinates(deviceLocation.latitude)}° N, {formatCoordinates(deviceLocation.longitude)}° O</span>
+                    </div>
+                  </div>
+                  <div className="info-row">
+                    <i className="bi bi-battery-half"></i>
+                    <div>
+                      <strong>Batería:</strong>
+                      <div className="battery-bar">
+                        <div 
+                          className="battery-level" 
+                          style={{
+                            width: `${deviceLocation.batteryPowerVal || 85}%`,
+                            backgroundColor: getBatteryColor(deviceLocation.batteryPowerVal || 85)
+                          }}
+                        ></div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="info-row">
+                    <i className="bi bi-clock"></i>
+                    <div>
+                      <strong>Última actualización:</strong><br />
+                      <span>{deviceLocation.gpsTime || new Date().toLocaleTimeString()}</span>
+                    </div>
+                  </div>
+                </div>
               </Popup>
             </Marker>
           )}
       </MapContainer>
 
-      {/* Botón Desbloquear sobre el mapa */}
-      {<button
+      <button
         onClick={handleUnlockClick}
-        style={{
-          position: "absolute",
-          top: "20px",
-          left: "50%",
-          transform: "translateX(-50%)",
-          zIndex: 1000,
-          backgroundColor: "#4CAF50",
-          color: "white",
-          border: "none",
-          borderRadius: "5px",
-          padding: "10px 20px",
-          cursor: "pointer",
-          boxShadow: "0px 4px 8px rgba(0, 0, 0, 0.2)",
-        }}
+        className="unlock-button"
+        aria-label="Desbloquear dispositivo"
       >
-        Desbloquear Bicicleta
+        <i className="bi bi-lock-fill"></i>
       </button>
-      }
 
-      {/* Mostrar UnlockDevice cuando showUnlock es true */}
       {showUnlock && (
-        <div
-          style={{
-            position: "fixed",
-            top: "50%",
-            left: "50%",
-            transform: "translate(-50%, -50%)",
-            backgroundColor: "white",
-            padding: "20px",
-            boxShadow: "0px 4px 8px rgba(0, 0, 0, 0.2)",
-            zIndex: 2000,
-          }}
-        >
-          <UnlockDevice accessToken={accessToken} />
-          <button
-            onClick={closeUnlock}
-            style={{
-              display: "block",
-              margin: "10px auto 0",
-              padding: "10px 20px",
-              backgroundColor: "red",
-              color: "white",
-              border: "none",
-              borderRadius: "5px",
-              cursor: "pointer",
-            }}
-          >
-            Cerrar
-          </button>
+        <div className="unlock-modal">
+          <div className="unlock-modal-content">
+            <div className="unlock-modal-header">
+              <h2>
+                <i className="bi bi-bicycle"></i>
+                {getDeviceTitle()}
+              </h2>
+              <button onClick={closeUnlock} className="close-button">
+                <i className="bi bi-x-lg"></i>
+              </button>
+            </div>
+            <UnlockDevice accessToken={accessToken} />
+          </div>
         </div>
       )}
     </div>
