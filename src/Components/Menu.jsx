@@ -3,11 +3,11 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { signInWithGoogle, logout } from "../firebaseAuth"; // Importar función de autenticación
 import "./menu.css";
 
-
 const Menu = () => {
   const navbarToggler = useRef(null);
   const navbarCollapse = useRef(null);
   const [user, setUser] = useState(null);
+  const [loadingPayment, setLoadingPayment] = useState(false); // Estado para el botón de pago
   const navigate = useNavigate();
 
   // Cerrar el menú en dispositivos pequeños
@@ -58,6 +58,43 @@ const Menu = () => {
     }
   }, []);
 
+  // Manejo del proceso de pago
+  const handlePayment = async () => {
+    if (!user) {
+      alert("Por favor, inicia sesión antes de realizar un pago.");
+      return;
+    }
+
+    setLoadingPayment(true);
+
+    try {
+      const response = await fetch("/api/mercadopago/create_payment", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          userEmail: `${user.name}@example.com`, // Asegúrate de tener un email válido
+          amount: 100, // Aquí defines el monto (puede ser dinámico)
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.init_point) {
+        window.location.href = data.init_point; // Redirige al checkout
+      } else {
+        console.error("No se pudo obtener el init_point:", data);
+        alert("Error al generar el pago. Intenta nuevamente.");
+      }
+    } catch (error) {
+      console.error("Error al procesar el pago:", error);
+      alert("Hubo un problema al procesar el pago.");
+    } finally {
+      setLoadingPayment(false);
+    }
+  };
+
   return (
     <nav className="navbar navbar-expand-lg fixed-top bg-body-tertiary">
       <div className="container-fluid">
@@ -93,6 +130,15 @@ const Menu = () => {
               <>
                 <li className="nav-item">
                   <span className="nav-link">Bienvenido, {user.name}</span>
+                </li>
+                <li className="nav-item">
+                  <button
+                    className="btn btn-primary"
+                    onClick={handlePayment}
+                    disabled={loadingPayment}
+                  >
+                    {loadingPayment ? "Procesando Pago..." : "Cargar Saldo"}
+                  </button>
                 </li>
                 <li className="nav-item">
                   <button className="btn btn-link nav-link" onClick={handleLogout}>

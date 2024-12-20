@@ -10,6 +10,11 @@ import TokenGen from "./Components/TokenGen";
 import RefreshToken from "./Components/RefreshToken";
 import DeviceLocation from "./Components/DeviceLocation";
 import Mapa from "./Components/Mapa";
+import Payment from "./Components/Payment";
+import Success from "./Components/Success";
+import Failure from "./Components/Failure";
+import Pending from "./Components/Pending";
+
 
 // Componente para renderizar el Footer condicionalmente
 const FooterWrapper = () => {
@@ -29,7 +34,11 @@ function App() {
           <Route path="/helpme" element={<Helpme />} />
           <Route path="/map" element={<Mapa />} />
           <Route path="*" element={<NotFound />} />
-        </Routes>
+          <Route path="/payment" element={<Payment />} />
+          <Route path="/success" element={<Success />} />
+          <Route path="/failure" element={<Failure />} />
+          <Route path="/pending" element={<Pending />} />
+          </Routes>
         <FooterWrapper />
         
         {/* Componentes globales */}
