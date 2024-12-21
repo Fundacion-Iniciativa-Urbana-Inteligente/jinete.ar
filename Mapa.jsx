@@ -9,13 +9,57 @@ const posadas = [-27.366666666667, -55.893];
 export default function Mapa({ accessToken }) {
   const { deviceLocation } = useLocation();
   const [showUnlock, setShowUnlock] = useState(false);
+  const [loadingPayment, setLoadingPayment] = useState(false); // Estado de carga para el pago
+  const [user, setUser] = useState(null); // Estado del usuario
 
   useEffect(() => {
     console.log("Device Location Data:", deviceLocation);
+
+    // Recuperar usuario almacenado en localStorage
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    }
   }, [deviceLocation]);
 
-  const handleUnlockClick = () => {
-    setShowUnlock(true);
+  const handleUnlockClick = async () => {
+    if (!user) {
+      alert("Por favor, inicia sesión antes de intentar desbloquear un dispositivo.");
+      return;
+    }
+
+    // Intentar cargar saldo antes de desbloquear
+    setLoadingPayment(true);
+
+    try {
+      const response = await fetch("/api/mercadopago/create_payment", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          userEmail: `${user.name}@example.com`, // Asegúrate de que sea un email válido
+          title: "Carga de saldo - Jinete.ar", // Título del servicio/producto
+          quantity: 1, // Cantidad
+          unitPrice: 100, // Precio unitario
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.init_point) {
+        // Redirigir al usuario al flujo de pago
+        window.location.href = data.init_point;
+      } else {
+        console.error("No se pudo obtener el init_point:", data);
+        alert("Error al generar el pago. Intenta nuevamente.");
+      }
+    } catch (error) {
+      console.error("Error al procesar el pago:", error);
+      alert("Hubo un problema al procesar el pago.");
+    } finally {
+      setLoadingPayment(false);
+    }
   };
 
   const closeUnlock = () => {
@@ -64,8 +108,11 @@ export default function Mapa({ accessToken }) {
                   <div className="info-row">
                     <i className="bi bi-geo-alt"></i>
                     <div>
-                      <strong>Ubicación:</strong><br />
-                      <span>{formatCoordinates(deviceLocation.latitude)}° N, {formatCoordinates(deviceLocation.longitude)}° O</span>
+                      <strong>Ubicación:</strong>
+                      <br />
+                      <span>
+                        {formatCoordinates(deviceLocation.latitude)}° N, {formatCoordinates(deviceLocation.longitude)}° O
+                      </span>
                     </div>
                   </div>
                   <div className="info-row">
@@ -73,11 +120,11 @@ export default function Mapa({ accessToken }) {
                     <div>
                       <strong>Batería:</strong>
                       <div className="battery-bar">
-                        <div 
-                          className="battery-level" 
+                        <div
+                          className="battery-level"
                           style={{
                             width: `${deviceLocation.batteryPowerVal || 85}%`,
-                            backgroundColor: getBatteryColor(deviceLocation.batteryPowerVal || 85)
+                            backgroundColor: getBatteryColor(deviceLocation.batteryPowerVal || 85),
                           }}
                         ></div>
                       </div>
@@ -86,7 +133,8 @@ export default function Mapa({ accessToken }) {
                   <div className="info-row">
                     <i className="bi bi-clock"></i>
                     <div>
-                      <strong>Última actualización:</strong><br />
+                      <strong>Última actualización:</strong>
+                      <br />
                       <span>{deviceLocation.gpsTime || new Date().toLocaleTimeString()}</span>
                     </div>
                   </div>
@@ -99,9 +147,10 @@ export default function Mapa({ accessToken }) {
       <button
         onClick={handleUnlockClick}
         className="unlock-button"
+        disabled={loadingPayment} // Deshabilita el botón mientras se procesa el pago
         aria-label="Desbloquear dispositivo"
       >
-        <i className="bi bi-lock-fill"></i>
+        {loadingPayment ? "Cargando Saldo..." : <i className="bi bi-lock-fill"></i>}
       </button>
 
       {showUnlock && (

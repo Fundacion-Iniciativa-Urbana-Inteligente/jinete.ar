@@ -9,15 +9,17 @@ import { MercadoPagoConfig, Preference } from 'mercadopago';
 // Configuración de variables de entorno
 dotenv.config();
 
+// Crear instancia de Express
 const app = express();
 const port = process.env.PORT || 8080;
 
+// Resolver __dirname en módulos ES
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Verificar token de Mercado Pago
 if (!process.env.MERCADOPAGO_TOKEN) {
-  console.error('❌ Error: El token de Mercado Pago no está configurado.');
+  console.error('❌ Error: El token de Mercado Pago no está configurado (MERCADOPAGO_TOKEN).');
   process.exit(1);
 }
 
@@ -29,12 +31,26 @@ const client = new MercadoPagoConfig({
 
 // Middleware global
 app.use(cors({
-  origin: ['https://jinete-ar.web.app', 'http://localhost:5173'],
+  origin: [
+    // Agrega los orígenes que necesitas permitir
+    'https://jinete-ar.web.app',
+    'http://localhost:5173',
+  ],
   methods: 'GET,POST,PUT,PATCH,DELETE',
   credentials: true,
 }));
-app.use(express.json()); // Configuración para procesar JSON
+
+// Para parsear JSON en el body de las requests
+app.use(express.json());
+
+// Servir archivos estáticos desde la carpeta "public"
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Ruta opcional para la raíz (GET /)
+// Te permitirá ver algo al acceder a la URL base
+app.get('/', (req, res) => {
+  res.send('¡Bienvenido al backend de JineteAr! Si ves este mensaje, el servidor está corriendo correctamente.');
+});
 
 // Función para crear una preferencia de pago
 const createPreference = async (email, title, quantity, unitPrice) => {
@@ -52,13 +68,11 @@ const createPreference = async (email, title, quantity, unitPrice) => {
 
     const response = await preference.create({
       body: {
-        payer: {
-          email: email,
-        },
+        payer: { email },
         items: [
           {
-            title: title,
-            quantity: quantity,
+            title,
+            quantity,
             unit_price: unitPrice,
           },
         ],
@@ -70,19 +84,18 @@ const createPreference = async (email, title, quantity, unitPrice) => {
         auto_return: 'approved',
       },
       requestOptions: {
-        idempotencyKey: idempotencyKey, // Usar el idempotencyKey dinámico
+        idempotencyKey, // Usar el idempotencyKey dinámico
       },
     });
 
     console.log('Respuesta completa de Mercado Pago:', response);
 
-    // Acceder directamente a response.init_point
     if (!response || !response.init_point) {
       throw new Error('La respuesta de Mercado Pago no contiene init_point.');
     }
 
     console.log('Preferencia creada exitosamente:', response);
-    return response; // Devolver la respuesta completa
+    return response;
   } catch (error) {
     if (error.response) {
       console.error('❌ Error en la respuesta de Mercado Pago:', error.response.data || error.response);
@@ -93,10 +106,9 @@ const createPreference = async (email, title, quantity, unitPrice) => {
   }
 };
 
-
 // Ruta para crear un pago en Mercado Pago
 app.post('/api/mercadopago/create_payment', async (req, res) => {
-  console.log('Cuerpo de la solicitud recibido:', req.body);
+  console.log('Solicitud para /api/mercadopago/create_payment, body:', req.body);
 
   const { userEmail, title, quantity, unitPrice } = req.body;
 
@@ -107,16 +119,17 @@ app.post('/api/mercadopago/create_payment', async (req, res) => {
 
   try {
     const preference = await createPreference(userEmail, title, quantity, unitPrice);
-    res.json({ init_point: preference.init_point }); // Usar init_point directamente desde la respuesta
+    // Enviar al cliente el link de pago
+    return res.json({ init_point: preference.init_point });
   } catch (error) {
     console.error('Error al crear la preferencia de pago:', error.message);
-    res.status(500).json({ message: 'Error al crear la preferencia de pago.' });
+    return res.status(500).json({ message: 'Error al crear la preferencia de pago.' });
   }
 });
 
 // Middleware global para manejar errores
 app.use((err, req, res, next) => {
-  console.error('❌ Error:', err.stack);
+  console.error('❌ Error en middleware global:', err.stack);
   res.status(500).json({ message: 'Ocurrió un error inesperado.' });
 });
 
