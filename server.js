@@ -1,105 +1,116 @@
 import dotenv from 'dotenv';
 import express from 'express';
-import mongoose from 'mongoose';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import cors from 'cors';
-import { MercadoPagoConfig } from 'mercadopago'; // Importación según tu preferencia
+import { randomUUID } from 'crypto'; // Para generar idempotencyKey
+import { MercadoPagoConfig, Preference } from 'mercadopago';
 
 // Configuración de variables de entorno
 dotenv.config();
 
-// Configuración de Express
 const app = express();
 const port = process.env.PORT || 8080;
 
-// Configuración de __dirname
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Verificar token de Mercado Pago
+if (!process.env.MERCADOPAGO_TOKEN) {
+  console.error('❌ Error: El token de Mercado Pago no está configurado.');
+  process.exit(1);
+}
+
 // Configuración de Mercado Pago
-const mercadoPagoConfig = new MercadoPagoConfig({
-  accessToken: process.env.MERCADOPAGO_TOKEN, // Configura tu Access Token
+const client = new MercadoPagoConfig({
+  accessToken: process.env.MERCADOPAGO_TOKEN,
+  options: { timeout: 5000 }, // Opciones generales del cliente
 });
 
-// Simula el objeto `mercadopago` que tenga el método `preferences.create`
-const mercadopago = {
-  preferences: {
-    create: async (preference) => {
-      // Aquí deberías realizar la lógica para interactuar con la API de Mercado Pago
-      // Puedes utilizar una librería HTTP como axios o fetch si no funciona directamente.
-      console.log("Creando preferencia con la API de Mercado Pago...");
-      return {
-        body: {
-          init_point: "https://www.mercadopago.com/checkout/v1/redirect?pref_id=123456789",
+// Middleware global
+app.use(cors({
+  origin: ['https://jinete-ar.web.app', 'http://localhost:5173'],
+  methods: 'GET,POST,PUT,PATCH,DELETE',
+  credentials: true,
+}));
+app.use(express.json()); // Configuración para procesar JSON
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Función para crear una preferencia de pago
+const createPreference = async (email, title, quantity, unitPrice) => {
+  const idempotencyKey = randomUUID(); // Generar un idempotencyKey único
+  const preference = new Preference(client);
+
+  try {
+    console.log('Creando preferencia con los siguientes datos:', {
+      email,
+      title,
+      quantity,
+      unitPrice,
+      idempotencyKey,
+    });
+
+    const response = await preference.create({
+      body: {
+        payer: {
+          email: email,
         },
-      };
-    },
-  },
+        items: [
+          {
+            title: title,
+            quantity: quantity,
+            unit_price: unitPrice,
+          },
+        ],
+        back_urls: {
+          success: 'https://jinete-ar.web.app/success',
+          failure: 'https://jinete-ar.web.app/failure',
+          pending: 'https://jinete-ar.web.app/pending',
+        },
+        auto_return: 'approved',
+      },
+      requestOptions: {
+        idempotencyKey: idempotencyKey, // Usar el idempotencyKey dinámico
+      },
+    });
+
+    console.log('Respuesta completa de Mercado Pago:', response);
+
+    // Acceder directamente a response.init_point
+    if (!response || !response.init_point) {
+      throw new Error('La respuesta de Mercado Pago no contiene init_point.');
+    }
+
+    console.log('Preferencia creada exitosamente:', response);
+    return response; // Devolver la respuesta completa
+  } catch (error) {
+    if (error.response) {
+      console.error('❌ Error en la respuesta de Mercado Pago:', error.response.data || error.response);
+    } else {
+      console.error('❌ Error no relacionado con la respuesta de Mercado Pago:', error.message);
+    }
+    throw new Error('No se pudo crear la preferencia de pago.');
+  }
 };
 
-// Conexión a MongoDB
-mongoose
-  .connect(process.env.MONGODB_URI)
-  .then(() => console.log('✅ Conectado a MongoDB'))
-  .catch((err) => console.error('❌ Error al conectar a MongoDB:', err));
-
-// Middleware
-app.use(
-  cors({
-    origin: ['https://jinete-ar.web.app', 'http://localhost:5173'],
-    methods: 'GET,POST,PUT,PATCH,DELETE',
-    credentials: true,
-  })
-);
-app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
 
 // Ruta para crear un pago en Mercado Pago
 app.post('/api/mercadopago/create_payment', async (req, res) => {
-  const { userEmail, amount } = req.body;
+  console.log('Cuerpo de la solicitud recibido:', req.body);
 
-  console.log("Datos recibidos en el backend:", { userEmail, amount });
+  const { userEmail, title, quantity, unitPrice } = req.body;
 
-  if (!userEmail || !amount || isNaN(amount) || amount <= 0) {
-    console.error("Parámetros inválidos:", { userEmail, amount });
+  if (!userEmail || !title || !quantity || !unitPrice) {
+    console.error('❌ Error: Parámetros inválidos recibidos:', { userEmail, title, quantity, unitPrice });
     return res.status(400).json({ message: 'Parámetros inválidos' });
   }
 
   try {
-    const preference = {
-      items: [
-        {
-          title: "Carga de saldo - Jinete.ar",
-          quantity: 1,
-          unit_price: parseFloat(amount),
-          currency_id: "ARS",
-        },
-      ],
-      payer: { email: userEmail },
-      back_urls: {
-        success: "https://jinete-ar.web.app/success",
-        failure: "https://jinete-ar.web.app/failure",
-        pending: "https://jinete-ar.web.app/pending",
-      },
-      auto_return: "approved",
-    };
-
-    console.log("Creando preferencia:", preference);
-
-    const response = await mercadopago.preferences.create(preference);
-
-    console.log("Respuesta del SDK de Mercado Pago:", response.body);
-
-    if (response.body.init_point) {
-      res.json({ init_point: response.body.init_point });
-    } else {
-      console.error("Error: No se recibió init_point");
-      res.status(500).json({ message: "Error: No se recibió la URL de pago." });
-    }
+    const preference = await createPreference(userEmail, title, quantity, unitPrice);
+    res.json({ init_point: preference.init_point }); // Usar init_point directamente desde la respuesta
   } catch (error) {
-    console.error("Error al crear la preferencia de pago:", error);
-    res.status(500).json({ message: "Error al crear la preferencia de pago." });
+    console.error('Error al crear la preferencia de pago:', error.message);
+    res.status(500).json({ message: 'Error al crear la preferencia de pago.' });
   }
 });
 

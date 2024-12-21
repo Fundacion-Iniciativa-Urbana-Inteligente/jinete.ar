@@ -37,7 +37,8 @@
     "react-qr-scanner": "^1.0.0-alpha.11",
     "react-router-dom": "^6.28.0",
     "react-webcam": "^7.2.0",
-    "twilio": "^5.4.0"
+    "twilio": "^5.4.0",
+    "uuid": "^11.0.3"
   },
   "devDependencies": {
     "@babel/cli": "^7.26.4",
