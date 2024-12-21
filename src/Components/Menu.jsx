@@ -64,9 +64,9 @@ const Menu = () => {
       alert("Por favor, inicia sesión antes de realizar un pago.");
       return;
     }
-
+  
     setLoadingPayment(true);
-
+  
     try {
       const response = await fetch("/api/mercadopago/create_payment", {
         method: "POST",
@@ -74,15 +74,17 @@ const Menu = () => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          userEmail: `${user.name}@example.com`, // Asegúrate de tener un email válido
-          amount: 100, // Aquí defines el monto (puede ser dinámico)
+          userEmail: `${user.name}@example.com`, // Email válido basado en el nombre del usuario
+          title: "Carga de saldo - Jinete.ar", // Título del producto o servicio
+          quantity: 1, // Cantidad (puede ser dinámica si lo necesitas)
+          unitPrice: 100, // Precio unitario (puede ser dinámico si lo necesitas)
         }),
       });
-
+  
       const data = await response.json();
-
+  
       if (data.init_point) {
-        window.location.href = data.init_point; // Redirige al checkout
+        window.location.href = data.init_point; // Redirige al checkout de Mercado Pago
       } else {
         console.error("No se pudo obtener el init_point:", data);
         alert("Error al generar el pago. Intenta nuevamente.");
@@ -94,7 +96,7 @@ const Menu = () => {
       setLoadingPayment(false);
     }
   };
-
+  
   return (
     <nav className="navbar navbar-expand-lg fixed-top bg-body-tertiary">
       <div className="container-fluid">
