@@ -1,23 +1,64 @@
-import React, { useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import axios from "axios";
+import Webcam from "react-webcam";
+import jsQR from "jsqr";
+import { useLocation } from "../Context/LocationContext";
 
-const UnlockDevice = ({ accessToken }) => {
+const UnlockDevice = () => {
+  const { accessToken } = useLocation(); // Obtenemos el token desde el contexto
   const [imei, setImei] = useState("");
   const [responseMessage, setResponseMessage] = useState("");
   const [error, setError] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [success, setSuccess] = useState(false);
+  const webcamRef = useRef(null);
+
+  useEffect(() => {
+    if (!accessToken || accessToken.trim() === "") {
+      setError("El token de acceso no está disponible. Por favor, inicia sesión nuevamente.");
+      return;
+    }
+
+    const interval = setInterval(() => {
+      if (!imei && !isProcessing) {
+        scanQRCode();
+      }
+    }, 500); // Escanea cada 500ms
+
+    return () => clearInterval(interval); // Limpia el intervalo cuando el componente se desmonta
+  }, [imei, isProcessing, accessToken]);
+
+  const scanQRCode = () => {
+    if (!webcamRef.current) return;
+
+    const canvas = document.createElement("canvas");
+    const video = webcamRef.current.video;
+
+    if (video.readyState === 4) {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+      const code = jsQR(imageData.data, canvas.width, canvas.height);
+      if (code) {
+        setImei(code.data.trim()); // Captura el texto del código QR y elimina espacios
+        setError(null); // Limpia cualquier error previo
+      }
+    }
+  };
 
   const handleUnlock = async () => {
     setError(null);
     setSuccess(false);
 
     if (!imei) {
-      setError("Por favor, ingresa un IMEI válido.");
+      setError("Por favor, escanea un código QR válido con un IMEI.");
       return;
     }
 
-    if (!accessToken) {
+    if (!accessToken || accessToken.trim() === "") {
       setError("El token de acceso no está disponible. Por favor, inicia sesión nuevamente.");
       return;
     }
@@ -79,32 +120,40 @@ const UnlockDevice = ({ accessToken }) => {
 
   return (
     <div className="unlock-form">
-      <div className="input-group">
-        <i className="bi bi-upc-scan"></i>
-        <input
-          type="text"
-          placeholder="Ingresa el código IMEI"
-          value={imei}
-          onChange={(e) => setImei(e.target.value)}
-          disabled={isProcessing}
-        />
-      </div>
+      <h3>Escanea el código QR del dispositivo</h3>
+      <Webcam
+        audio={false}
+        ref={webcamRef}
+        screenshotFormat="image/jpeg"
+        style={{ width: "100%", height: "auto" }}
+      />
+
+      {imei && (
+        <div className="input-group">
+          <i className="bi bi-upc-scan"></i>
+          <input
+            type="text"
+            placeholder="Código IMEI escaneado"
+            value={imei}
+            readOnly
+            disabled
+          />
+        </div>
+      )}
 
       <button
         onClick={handleUnlock}
         disabled={isProcessing}
-        className={`unlock-submit-button ${isProcessing ? 'processing' : ''}`}
+        className={`unlock-submit-button ${isProcessing ? "processing" : ""}`}
       >
         {isProcessing ? (
           <>
-            <i className="bi bi-arrow-repeat spinning"></i>
-            Procesando...
+            <i className="bi bi-arrow-repeat spinning"></i> Procesando...
           </>
         ) : (
-          <>
-            <i className="bi bi-unlock"></i>
-            Desbloquear
-          </>
+          <span>
+            <i className="bi bi-unlock"></i> Desbloquear
+          </span>
         )}
       </button>
 
