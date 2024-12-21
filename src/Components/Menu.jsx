@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { signInWithGoogle, logout } from "../firebaseAuth"; // Importar función de autenticación
-import "./menu.css";
+import "./Menu.css";
 
 const Menu = () => {
   const navbarToggler = useRef(null);
