@@ -11,7 +11,12 @@ export default function Mapa({ accessToken }) {
   const [showUnlock, setShowUnlock] = useState(false);
 
   useEffect(() => {
-    console.log("Device Location Data:", deviceLocation);
+    if (deviceLocation) {
+      console.log("Coordenadas del dispositivo:", {
+        latitude: deviceLocation.latitude || deviceLocation.lat,
+        longitude: deviceLocation.longitude || deviceLocation.lng
+      });
+    }
   }, [deviceLocation]);
 
   const handleUnlockClick = () => {
@@ -34,14 +39,53 @@ export default function Mapa({ accessToken }) {
 
   const getDeviceTitle = () => {
     if (!deviceLocation) return "Bicicleta Sin ID";
-    const name = deviceLocation.deviceName || deviceLocation.device_name || deviceLocation.imei;
-    return `Bicicleta ${name || "Sin ID"}`;
+    const name = deviceLocation.deviceName || deviceLocation.device_name || deviceLocation.name || "Sin Nombre";
+    const id = deviceLocation.imei || deviceLocation.id || "Sin ID";
+    return `Bicicleta ${name} #${id}`;
+  };
+
+  const getStatusText = (status) => {
+    switch(status) {
+      case '1': return 'Disponible';
+      case '2': return 'En uso';
+      case '3': return 'Mantenimiento';
+      default: return 'Desconocido';
+    }
+  };
+
+  const getSignalQuality = (gpsSignal) => {
+    const signal = parseInt(gpsSignal);
+    if (signal >= 4) return { text: 'Buena', color: '#4CAF50' };
+    if (signal >= 2) return { text: 'Regular', color: '#FFC107' };
+    return { text: 'Débil', color: '#dc3545' };
+  };
+
+  const formatBattery = (batteryPowerVal) => {
+    if (!batteryPowerVal) return '0%';
+    const voltage = parseFloat(batteryPowerVal);
+    // Convertir voltaje a porcentaje (asumiendo rango 3.2V - 4.2V)
+    const percentage = Math.round(((voltage - 3.2) / (4.2 - 3.2)) * 100);
+    return `${Math.min(Math.max(percentage, 0), 100)}%`;
+  };
+
+  const formatDateTime = (dateTimeStr) => {
+    if (!dateTimeStr) return '';
+    const date = new Date(dateTimeStr);
+    return date.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  };
+
+  const getCoordinates = () => {
+    if (!deviceLocation) return posadas;
+    return [
+      deviceLocation.latitude || deviceLocation.lat || posadas[0],
+      deviceLocation.longitude || deviceLocation.lng || posadas[1]
+    ];
   };
 
   return (
     <div id="mapa">
       <MapContainer
-        center={deviceLocation ? [deviceLocation.latitude, deviceLocation.longitude] : posadas}
+        center={getCoordinates()}
         zoom={15}
         zoomControl={true}
         scrollWheelZoom={true}
@@ -51,49 +95,81 @@ export default function Mapa({ accessToken }) {
         attributionControl={false}
       >
         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-        {deviceLocation &&
-          deviceLocation.latitude !== undefined &&
-          deviceLocation.longitude !== undefined && (
-            <Marker position={[deviceLocation.latitude, deviceLocation.longitude]}>
-              <Popup className="custom-popup">
-                <div className="popup-header">
-                  <i className="bi bi-bicycle"></i>
-                  <h3>{getDeviceTitle()}</h3>
-                </div>
-                <div className="popup-content">
-                  <div className="info-row">
-                    <i className="bi bi-geo-alt"></i>
-                    <div>
-                      <strong>Ubicación:</strong><br />
-                      <span>{formatCoordinates(deviceLocation.latitude)}° N, {formatCoordinates(deviceLocation.longitude)}° O</span>
-                    </div>
-                  </div>
-                  <div className="info-row">
-                    <i className="bi bi-battery-half"></i>
-                    <div>
-                      <strong>Batería:</strong>
-                      <div className="battery-bar">
-                        <div 
-                          className="battery-level" 
-                          style={{
-                            width: `${deviceLocation.batteryPowerVal || 85}%`,
-                            backgroundColor: getBatteryColor(deviceLocation.batteryPowerVal || 85)
-                          }}
-                        ></div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="info-row">
-                    <i className="bi bi-clock"></i>
-                    <div>
-                      <strong>Última actualización:</strong><br />
-                      <span>{deviceLocation.gpsTime || new Date().toLocaleTimeString()}</span>
-                    </div>
+        {deviceLocation && (
+          <Marker position={getCoordinates()}>
+            <Popup className="custom-popup">
+              <div className="popup-header">
+                <i className="bi bi-bicycle"></i>
+                {deviceLocation.deviceName || 'Sin nombre'} #{deviceLocation.imei}
+              </div>
+              <div className="popup-content">
+                <div className="info-row">
+                  <i className="bi bi-circle-fill status-icon" style={{
+                    color: deviceLocation.status === '1' ? '#4CAF50' : '#dc3545'
+                  }}></i>
+                  <div>
+                    <label>Estado:</label>
+                    <span>{getStatusText(deviceLocation.status)}</span>
                   </div>
                 </div>
-              </Popup>
-            </Marker>
-          )}
+                <div className="info-row">
+                  <i className="bi bi-reception-4"></i>
+                  <div>
+                    <label>Señal:</label>
+                    <span style={{ color: getSignalQuality(deviceLocation.gpsSignal).color }}>
+                      {getSignalQuality(deviceLocation.gpsSignal).text} ({deviceLocation.gpsNum} satélites)
+                    </span>
+                  </div>
+                </div>
+                <div className="info-row">
+                  <i className="bi bi-battery"></i>
+                  <div>
+                    <label>Batería:</label>
+                    <span>{formatBattery(deviceLocation.batteryPowerVal)}</span>
+                  </div>
+                </div>
+                <div className="info-row">
+                  <i className="bi bi-geo-alt"></i>
+                  <div>
+                    <label>Ubicación:</label>
+                    <span>{deviceLocation.lat}° N, {deviceLocation.lng}° O</span>
+                  </div>
+                </div>
+                <div className="info-row">
+                  <i className="bi bi-speedometer2"></i>
+                  <div>
+                    <label>Kilometraje:</label>
+                    <span>{parseFloat(deviceLocation.currentMileage).toFixed(2)} km</span>
+                  </div>
+                </div>
+                <div className="info-row">
+                  <i className="bi bi-clock"></i>
+                  <div>
+                    <label>Última actualización:</label>
+                    <span>{formatDateTime(deviceLocation.gpsTime)}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="device-actions">
+                <button 
+                  onClick={handleUnlockClick}
+                  className="btn btn-primary w-100"
+                  disabled={deviceLocation.status !== '1'}
+                >
+                  <i className="bi bi-unlock"></i>
+                  {deviceLocation.status === '1' ? 'Desbloquear' : 'No disponible'}
+                </button>
+                <button 
+                  onClick={() => window.location.href = `https://wa.me/+5493513385327?text=Hola, necesito ayuda con la bicicleta ${deviceLocation.deviceName} (${deviceLocation.imei})`}
+                  className="btn btn-success w-100"
+                >
+                  <i className="bi bi-whatsapp"></i>
+                  Contactar Soporte
+                </button>
+              </div>
+            </Popup>
+          </Marker>
+        )}
       </MapContainer>
 
       <button
