@@ -2,12 +2,22 @@ import dotenv from 'dotenv';
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import functions from 'firebase-functions'; // Para acceder a las variables configuradas
 import cors from 'cors';
 import { randomUUID } from 'crypto'; // Para generar idempotencyKey
 import { MercadoPagoConfig, Preference } from 'mercadopago';
 
-// Configuración de variables de entorno
+// Configuración de variables de entorno local
 dotenv.config();
+
+// Carga de las variables de entorno desde Firebase Functions
+const config = functions.config();
+const PORT = config.app.port || 3000; // Puerto de la app, usa 3000 como predeterminado
+const JWT_SECRET = config.jwt.secret; // Secreto para JWT
+const MP_PUBLIC_KEY = config.mercadopago.public_key; // Clave pública de MercadoPago
+const MP_CLIENT_ID = config.mercadopago.client_id; // Client ID de MercadoPago
+const MP_CLIENT_SECRET = config.mercadopago.client_secret; // Client Secret de MercadoPago
+const MP_ACCESS_TOKEN = config.mercadopago.token; // Token de acceso de MercadoPago
 
 // Crear instancia de Express
 const app = express();
