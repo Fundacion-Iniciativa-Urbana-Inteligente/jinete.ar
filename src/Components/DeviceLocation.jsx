@@ -53,10 +53,11 @@ const DeviceLocation = ({ heartbeat }) => {
         const locationData = response.data.result[0]; // Accede al primer resultado
         console.log("Datos de la API:", locationData);
 
-        // Actualiza el contexto con lat y lng
+        // Actualiza el contexto con todos los datos del dispositivo
         setDeviceLocation({
-          latitude: locationData.lat,
-          longitude: locationData.lng,
+          ...locationData,
+          latitude: parseFloat(locationData.lat),
+          longitude: parseFloat(locationData.lng)
         });
       }
     } catch (error) {
