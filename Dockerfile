@@ -1,5 +1,5 @@
 # Etapa 1: Construir el frontend con Vite
-FROM node:18-alpine as build
+FROM node:20-alpine as build
 
 # Crear un directorio de trabajo para el frontend
 WORKDIR /app
@@ -16,16 +16,15 @@ COPY . .
 # Construir el frontend en modo producción
 RUN npm run build
 
----
-
 # Etapa 2: Configurar el servidor de Node.js para producción
-FROM node:18-alpine
+FROM node:20-alpine
 
 # Crear un directorio de trabajo para el backend
 WORKDIR /app
 
 # Copiar los archivos necesarios del backend
-COPY package.json package-lock.json server.js ./
+COPY package.json package-lock.json server.js ./ 
+COPY ./src ./src
 
 # Instalar solo las dependencias de producción
 RUN npm install --production

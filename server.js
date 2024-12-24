@@ -2,7 +2,6 @@ import dotenv from 'dotenv';
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import functions from 'firebase-functions'; // Para acceder a las variables configuradas
 import cors from 'cors';
 import { randomUUID } from 'crypto'; // Para generar idempotencyKey
 import { MercadoPagoConfig, Preference } from 'mercadopago';
@@ -16,16 +15,7 @@ if (process.env.NODE_ENV !== 'production') {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Configuración de variables de entorno desde Firebase Functions
-const config = functions.config();
-const PORT = config.app?.port || process.env.PORT || 8080; // Puerto de la app
-const JWT_SECRET = config.jwt?.secret || process.env.JWT_SECRET; // Secreto para JWT
-const MP_PUBLIC_KEY = config.mercadopago?.public_key || process.env.MERCADOPAGO_PUBLIC_KEY; // Clave pública
-const MP_CLIENT_ID = config.mercadopago?.client_id || process.env.MERCADOPAGO_CLIENT_ID; // Client ID
-const MP_CLIENT_SECRET =  config.mercadopago?.client_secret || process.env.MERCADOPAGO_CLIENT_SECRET; // Client Secret
-const MP_ACCESS_TOKEN = config.mercadopago?.token || process.env.MERCADOPAGO_TOKEN; // Token de acceso
-
-// Crear instancia de Express
+// Configuración de Express
 const app = express();
 const port = process.env.PORT || 8080;
 
