@@ -1,7 +1,6 @@
 import React, { useRef, useState, useEffect } from "react";
 import axios from "axios";
-import Webcam from "react-webcam";
-import jsQR from "jsqr";
+import { BrowserMultiFormatReader } from "@zxing/browser";
 import { useLocation } from "../Context/LocationContext";
 
 const UnlockDevice = () => {
@@ -11,7 +10,8 @@ const UnlockDevice = () => {
   const [error, setError] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [success, setSuccess] = useState(false);
-  const webcamRef = useRef(null);
+  const videoRef = useRef(null);
+  const codeReader = useRef(null);
 
   useEffect(() => {
     if (!accessToken || accessToken.trim() === "") {
@@ -19,34 +19,37 @@ const UnlockDevice = () => {
       return;
     }
 
-    const interval = setInterval(() => {
-      if (!imei && !isProcessing) {
-        scanQRCode();
-      }
-    }, 500); // Escanea cada 500ms
+    codeReader.current = new BrowserMultiFormatReader();
 
-    return () => clearInterval(interval); // Limpia el intervalo cuando el componente se desmonta
-  }, [imei, isProcessing, accessToken]);
+    // Inicia el escaneo de Data Matrix
+    startScanner();
 
-  const scanQRCode = () => {
-    if (!webcamRef.current) return;
+    return () => {
+      // Detenemos el lector al desmontar el componente
+      codeReader.current?.reset();
+    };
+  }, [accessToken]);
 
-    const canvas = document.createElement("canvas");
-    const video = webcamRef.current.video;
+  const startScanner = () => {
+    codeReader.current
+      .decodeFromVideoDevice(null, videoRef.current, (result, err) => {
+        if (result) {
+          setImei(result.getText()); // Extrae el texto del Data Matrix
+          setError(null);
+          stopScanner();
+        }
+        if (err) {
+          console.error(err);
+        }
+      })
+      .catch((err) => {
+        console.error("Error iniciando el escáner:", err);
+        setError("No se pudo iniciar el escáner. Verifica tu cámara.");
+      });
+  };
 
-    if (video.readyState === 4) {
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      const ctx = canvas.getContext("2d");
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-
-      const code = jsQR(imageData.data, canvas.width, canvas.height);
-      if (code) {
-        setImei(code.data.trim()); // Captura el texto del código QR y elimina espacios
-        setError(null); // Limpia cualquier error previo
-      }
-    }
+  const stopScanner = () => {
+    codeReader.current?.reset();
   };
 
   const handleUnlock = async () => {
@@ -54,7 +57,7 @@ const UnlockDevice = () => {
     setSuccess(false);
 
     if (!imei) {
-      setError("Por favor, escanea un código QR válido con un IMEI.");
+      setError("Por favor, escanea un código Data Matrix válido con un IMEI.");
       return;
     }
 
@@ -120,13 +123,8 @@ const UnlockDevice = () => {
 
   return (
     <div className="unlock-form">
-      <h3>Escanea el código QR del dispositivo</h3>
-      <Webcam
-        audio={false}
-        ref={webcamRef}
-        screenshotFormat="image/jpeg"
-        style={{ width: "100%", height: "auto" }}
-      />
+      <h3>Escanea el código Data Matrix del dispositivo</h3>
+      <video ref={videoRef} style={{ width: "100%", height: "auto" }} />
 
       {imei && (
         <div className="input-group">

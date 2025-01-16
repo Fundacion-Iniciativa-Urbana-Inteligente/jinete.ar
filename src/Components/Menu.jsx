@@ -67,21 +67,26 @@ const Menu = () => {
   
     setLoadingPayment(true);
   
+    // Acceso correcto a la variable de entorno con Vite
+    const backendUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:8080";
+  
     try {
-      const response = await fetch("/api/mercadopago/create_payment", {
+      const response = await fetch(`${backendUrl}/api/mercadopago/create_payment`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          userEmail: `${user.name}@example.com`, // Email válido basado en el nombre del usuario
-          title: "Carga de saldo - Jinete.ar", // Título del producto o servicio
-          quantity: 1, // Cantidad (puede ser dinámica si lo necesitas)
-          unitPrice: 100, // Precio unitario (puede ser dinámico si lo necesitas)
+          userEmail: `${user.name}@example.com`,
+          title: "Alquiler x 1hora - Jinete.ar",
+          quantity: 1,
+          unitPrice: 10,
         }),
       });
   
+      console.log("Respuesta del servidor:", response);
       const data = await response.json();
+      console.log("Datos recibidos:", data);
   
       if (data.init_point) {
         window.location.href = data.init_point; // Redirige al checkout de Mercado Pago
@@ -96,7 +101,7 @@ const Menu = () => {
       setLoadingPayment(false);
     }
   };
-  
+
   return (
     <nav className="navbar navbar-expand-lg fixed-top bg-body-tertiary">
       <div className="container-fluid">
