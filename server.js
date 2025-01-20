@@ -8,6 +8,8 @@ import { randomUUID } from 'crypto'; // Para generar idempotencyKey
 import { MercadoPagoConfig, Preference } from 'mercadopago';
 import crypto from 'crypto'; // Para hashear la contraseña a MD5
 import axios from 'axios'; // Añadido para las consultas a Jimi IoT
+import fs from 'fs';
+
 
 let currentAccessToken = null;
 let currentRefreshToken = null;
@@ -44,9 +46,20 @@ const JIMI_USER_ID = process.env.JIMI_USER_ID;
 const JIMI_USER_PWD = process.env.JIMI_USER_PWD;
 const JIMI_URL = process.env.JIMI_URL;
 
-// Inicializar Firebase Admin SDK
-import serviceAccount from './serviceAccountKey.json' assert { type: 'json' };
+let serviceAccount;
 
+// Intenta cargar las credenciales desde la variable de entorno
+if (process.env.SERVICE_ACCOUNT_KEY) {
+  serviceAccount = JSON.parse(process.env.SERVICE_ACCOUNT_KEY);
+} else {
+  // Si no existe la variable de entorno, intenta cargar el archivo local
+  try {
+      serviceAccount = JSON.parse(fs.readFileSync('./serviceAccountKey.json', 'utf8'));
+  } catch (error) {
+      console.error('No se pudo cargar el archivo serviceAccountKey.json o la variable de entorno SERVICE_ACCOUNT_KEY. Verifica la configuración.');
+      process.exit(1); // Finaliza el proceso si no se pueden cargar las credenciales
+  }
+}
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
@@ -54,6 +67,8 @@ admin.initializeApp({
 });
 
 const db = admin.firestore(); // Instancia de Firestore
+
+console.log('Firebase Admin SDK inicializado correctamente.');
 
 // Middleware global
 app.use(cors({
