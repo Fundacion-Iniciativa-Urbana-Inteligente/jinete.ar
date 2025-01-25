@@ -1,13 +1,16 @@
-import React, { useRef, useContext } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-import { AuthContext } from "../Context/AuthContext";
+import { signInWithGoogle, logout } from "../firebaseAuth"; // Importar función de autenticación
 import "./Menu.css";
+import { AuthContext } from "../Context/AuthContext"
 
 const Menu = () => {
   const navbarToggler = useRef(null);
   const navbarCollapse = useRef(null);
-  const { user, login, logout } = useContext(AuthContext); // Usamos únicamente AuthContext
+  const [user, setUser] = useState(null);
+  const [loadingPayment, setLoadingPayment] = useState(false); // Estado para el botón de pago
   const navigate = useNavigate();
+  const { user: authUser, login, logout } = useContext(AuthContext);
 
   // Cerrar el menú en dispositivos pequeños
   const closeMenu = () => {
@@ -16,15 +19,54 @@ const Menu = () => {
     }
   };
 
+  // Manejo de Login con Google
+  return (
+    <nav>
+      {/* Render del menú basado en el estado del usuario */}
+      {user ? (
+        <button onClick={logout}>Cerrar Sesión</button>
+      ) : (
+        <button onClick={() => login({ name: "Usuario" })}>Iniciar Sesión</button>
+      )}
+    </nav>
+  );
+};
+
+  // Logout
+  const handleLogout = async () => {
+    try {
+      await logout(); // Llamar a la función logout de firebaseAuth.js
+      localStorage.removeItem("user"); // Borra el usuario del localStorage
+      setUser(null); // Actualiza el estado del usuario
+      console.log("Sesión cerrada exitosamente");
+      navigate("/"); // Redirige a la página principal
+    } catch (error) {
+      console.error("Error al cerrar sesión:", error.message);
+      alert("Hubo un error al cerrar la sesión. Intenta nuevamente.");
+    }
+  };  
+
+  // Recuperar usuario almacenado en localStorage
+  useEffect(() => {
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    }
+  }, []);
+
   // Manejo del proceso de pago
   const handlePayment = async () => {
     if (!user) {
       alert("Por favor, inicia sesión antes de realizar un pago.");
       return;
     }
-
+  
+    setLoadingPayment(true);
+  
+    // Acceso correcto a la variable de entorno con Vite
+    const backendUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:8080";
+  
     try {
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:8080";
       const response = await fetch(`${backendUrl}/api/mercadopago/create_payment`, {
         method: "POST",
         headers: {
@@ -37,16 +79,22 @@ const Menu = () => {
           unitPrice: 10,
         }),
       });
-
+  
+      console.log("Respuesta del servidor:", response);
       const data = await response.json();
+      console.log("Datos recibidos:", data);
+  
       if (data.init_point) {
         window.location.href = data.init_point; // Redirige al checkout de Mercado Pago
       } else {
+        console.error("No se pudo obtener el init_point:", data);
         alert("Error al generar el pago. Intenta nuevamente.");
       }
     } catch (error) {
       console.error("Error al procesar el pago:", error);
       alert("Hubo un problema al procesar el pago.");
+    } finally {
+      setLoadingPayment(false);
     }
   };
 
@@ -90,19 +138,20 @@ const Menu = () => {
                   <button
                     className="btn btn-primary"
                     onClick={handlePayment}
+                    disabled={loadingPayment}
                   >
-                    Cargar Saldo
+                    {loadingPayment ? "Procesando Pago..." : "Cargar Saldo"}
                   </button>
                 </li>
                 <li className="nav-item">
-                  <button className="btn btn-link nav-link" onClick={logout}>
+                  <button className="btn btn-link nav-link" onClick={handleLogout}>
                     Logout
                   </button>
                 </li>
               </>
             ) : (
               <li className="nav-item">
-                <button className="btn btn-primary" onClick={login}>
+                <button className="btn btn-primary" onClick={handleLogin}>
                   Ingresar con Google
                 </button>
               </li>

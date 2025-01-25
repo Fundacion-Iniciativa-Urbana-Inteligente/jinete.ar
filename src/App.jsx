@@ -5,16 +5,12 @@ import Home from "./Pages/Home";
 import NotFound from "./Pages/NotFound";
 import Helpme from "./Pages/Helpme";
 import Footer from "./Components/Footer";
-import { LocationProvider } from "./Context/LocationContext";
-import TokenGen from "./Components/TokenGen";
-import RefreshToken from "./Components/RefreshToken";
-import DeviceLocation from "./Components/DeviceLocation";
 import Mapa from "./Components/Mapa";
 import Payment from "./Components/Payment";
 import Success from "./Components/Success";
 import Failure from "./Components/Failure";
 import Pending from "./Components/Pending";
-
+import { AuthProvider } from "./Context/AuthContext"; // Importar AuthProvider
 
 // Componente para renderizar el Footer condicionalmente
 const FooterWrapper = () => {
@@ -26,7 +22,7 @@ const FooterWrapper = () => {
 
 function App() {
   return (
-    <LocationProvider>
+    <AuthProvider> {/* Envolvemos la aplicación */}
       <Router>
         <Menu />
         <Routes>
@@ -38,15 +34,9 @@ function App() {
           <Route path="/success" element={<Success />} />
           <Route path="/failure" element={<Failure />} />
           <Route path="/pending" element={<Pending />} />
-          </Routes>
-        <FooterWrapper />
-        
-        {/* Componentes globales */}
-        <TokenGen />
-        <RefreshToken />
-        <DeviceLocation heartbeat={10} />
+        </Routes>
       </Router>
-    </LocationProvider>
+    </AuthProvider>
   );
 }
 

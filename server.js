@@ -408,19 +408,105 @@ async function initializeIntegration() {
   }
 }
 
-//Ruta tempportal para consultar token
-app.get('/current-token', async (req, res) => {
+// Ruta para desbloquear bicicleta
+app.post('/api/unlock', async (req, res) => {
+  const { imei } = req.body;
+
+  if (!imei || typeof imei !== 'string') {
+    return res.status(400).json({ message: 'IMEI inválido o no proporcionado.' });
+  }
+
   try {
+    // Obtener el token desde Firebase
     const tokenDoc = await db.collection('tokens').doc('jimi-token').get();
     if (!tokenDoc.exists) {
-      return res.status(404).json({ message: 'Token no encontrado' });
+      return res.status(401).json({ message: 'Token de acceso no disponible. Intenta nuevamente.' });
     }
-    return res.status(200).json(tokenDoc.data());
+
+    const tokenData = tokenDoc.data();
+    const accessToken = tokenData.accessToken;
+
+    if (!accessToken || accessToken.trim() === '') {
+      return res.status(401).json({ message: 'Token de acceso inválido o vacío.' });
+    }
+
+    const commonParams = generateCommonParameters('jimi.open.instruction.send');
+
+    const instParamJson = {
+      inst_id: '416',
+      inst_template: 'OPEN#',
+      params: [],
+      is_cover: 'true',
+    };
+
+    const payload = {
+      ...commonParams,
+      access_token: accessToken,
+      imei,
+      inst_param_json: JSON.stringify(instParamJson),
+    };
+
+    const response = await axios.post(process.env.JIMI_URL, payload, {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+
+    if (response.data && response.data.code === 0) {
+      const result = response.data.result;
+
+      if (result.includes('OPEN set OK')) {
+        return res.status(200).json({ message: '¡Bicicleta desbloqueada correctamente!' });
+      } else if (result.includes('OPEN command is not executed')) {
+        return res.status(200).json({ message: 'La bicicleta ya está desbloqueada.' });
+      } else {
+        return res.status(500).json({ message: 'Respuesta desconocida del servidor.' });
+      }
+    } else {
+      return res.status(500).json({ message: response.data.message || 'Error desconocido al desbloquear.' });
+    }
   } catch (error) {
-    console.error('❌ Error al obtener el token actual:', error.message);
-    return res.status(500).json({ error: 'Error al obtener el token actual.' });
+    console.error('Error al desbloquear la bicicleta:', error.message);
+    return res.status(500).json({ message: 'Error al procesar la solicitud de desbloqueo.' });
   }
 });
+// Ruta para obtener localizciones de bicicletas
+app.get('/api/bicycles', async (req, res) => {
+  try {
+    const bicycles = await db.collection('deviceLocations').get();
+    const result = bicycles.docs.map((doc) => doc.data());
+    res.json(result);
+  } catch (error) {
+    console.error('Error al obtener bicicletas:', error);
+    res.status(500).json({ message: 'Error al obtener bicicletas.' });
+  }
+});
+
+// Generacion de tokens en el servidor para desbloquear bicicletas
+app.get('/api/token/:imei', async (req, res) => {
+  const { imei } = req.params;
+
+  if (!imei) {
+    return res.status(400).json({ message: 'IMEI no proporcionado.' });
+  }
+
+  try {
+    // Generar un token numérico de 4 dígitos
+    const token = Math.floor(1000 + Math.random() * 9000); // Genera un número entre 1000 y 9999
+    const expirationTime = Date.now() + 180 * 1000; // Validez de 180 segundos
+
+    // Guardar el token en Firestore asociado al IMEI
+    await db.collection('tokens').doc(imei).set({
+      token: token.toString(),
+      expirationTime,
+    });
+
+    res.json({ token: token.toString(), expirationTime });
+  } catch (error) {
+    console.error('Error al generar el token:', error.message);
+    res.status(500).json({ message: 'Error al generar el token.' });
+  }
+});
+
+
 
 
 // Middleware global para manejar errores
