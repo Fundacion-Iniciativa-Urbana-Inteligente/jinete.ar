@@ -9,7 +9,7 @@ import { MercadoPagoConfig, Preference } from 'mercadopago';
 import crypto from 'crypto'; // Para hashear la contraseña a MD5
 import axios from 'axios'; // Añadido para las consultas a Jimi IoT
 import fs from 'fs';
-
+import twilio from 'twilio';
 
 let currentAccessToken = null;
 let currentRefreshToken = null;
@@ -27,6 +27,9 @@ const __dirname = path.dirname(__filename);
 // Configuración de Express
 const app = express();
 const port = process.env.PORT || 8080;
+
+//Configuracion de twilio
+const twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
 // Verificar token de Mercado Pago
 if (!process.env.MERCADOPAGO_TOKEN) {
@@ -69,6 +72,51 @@ admin.initializeApp({
 const db = admin.firestore(); // Instancia de Firestore
 
 console.log('Firebase Admin SDK inicializado correctamente.');
+
+// Ruta para manejar los mensajes entrantes de WhatsApp
+app.post('/webhook/whatsapp', async (req, res) => {
+  const { Body, From } = req.body; // El contenido del mensaje y el número del usuario
+  console.log(`Mensaje recibido de ${From}: ${Body}`);
+
+  try {
+    // Extraer el texto enviado por el usuario
+    const userMessage = Body.toLowerCase();
+
+    // Verificar si el mensaje contiene "reservar la bicicleta"
+    if (userMessage.includes('reservar la bicicleta')) {
+      // Generar un token único
+      const token = Math.floor(1000 + Math.random() * 9000); // Genera un token de 4 dígitos
+      const expirationTime = Date.now() + 180 * 1000; // 180 segundos de validez
+
+      // Guardar el token en Firestore asociado al número de WhatsApp
+      await db.collection('whatsappTokens').doc(From).set({
+        token: token.toString(),
+        expirationTime,
+      });
+
+      // Responder al usuario con el token
+      await twilioClient.messages.create({
+        body: `¡Hola! Tu token para reservar la bicicleta es: ${token}. Validez: 3 minutos.`,
+        from: 'whatsapp:+14155238886', // Número de WhatsApp de Twilio
+        to: From,
+      });
+
+      return res.status(200).send('Token enviado al usuario.');
+    } else {
+      // Respuesta para mensajes no reconocidos
+      await twilioClient.messages.create({
+        body: 'Lo siento, no entendí tu mensaje. Por favor escribe "reservar la bicicleta".',
+        from: 'whatsapp:+14155238886', // Número de WhatsApp de Twilio
+        to: From,
+      });
+
+      return res.status(200).send('Mensaje no reconocido enviado al usuario.');
+    }
+  } catch (error) {
+    console.error('Error al manejar el mensaje de WhatsApp:', error.message);
+    res.status(500).json({ message: 'Error al procesar el mensaje de WhatsApp.' });
+  }
+});
 
 // Middleware global
 app.use(cors({
