@@ -26,6 +26,10 @@ WORKDIR /app
 COPY package.json package-lock.json server.js ./ 
 COPY ./src ./src
 
+# Copia los archivos de secretos
+COPY .env .env
+COPY serviceAccountKey.json serviceAccountKey.json
+
 # Instalar solo las dependencias de producción
 RUN npm install --production
 

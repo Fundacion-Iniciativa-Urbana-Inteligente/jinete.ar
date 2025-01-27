@@ -20,6 +20,15 @@ if (process.env.NODE_ENV !== 'production') {
   dotenv.config();
 }
 
+//Configuracion de serviceAccountKey.json
+if (process.env.SERVICE_ACCOUNT_KEY) {
+  serviceAccount = JSON.parse(process.env.SERVICE_ACCOUNT_KEY);
+} else {
+  console.error('No se pudo cargar el archivo serviceAccountKey.json o la variable de entorno SERVICE_ACCOUNT_KEY. Verifica la configuración.');
+  process.exit(1);
+}
+
+
 // Resolver __dirname en módulos ES
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
