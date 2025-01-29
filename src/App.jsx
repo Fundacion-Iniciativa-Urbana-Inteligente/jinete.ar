@@ -11,7 +11,6 @@ import Success from "./Components/Success";
 import Failure from "./Components/Failure";
 import Pending from "./Components/Pending";
 import { AuthProvider } from "./Context/AuthContext"; // Importar AuthProvider
-import "bootstrap/dist/css/bootstrap.min.css";
 
 // Componente para renderizar el Footer condicionalmente
 const FooterWrapper = () => {

@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { MapContainer, Marker, Popup, TileLayer } from "react-leaflet";
 import axios from "axios";
-import "./Mapa.css";
 
 const defaultPosition = [-27.366666666667, -55.893];
 
@@ -10,8 +9,6 @@ export default function Mapa() {
   const [selectedBike, setSelectedBike] = useState(null);
   const [unlockToken, setUnlockToken] = useState("");
   const [message, setMessage] = useState("");
-  const [timerText, setTimerText] = useState("Token no generado.");
-  const [timerInterval, setTimerInterval] = useState(null);
 
   useEffect(() => {
     const fetchBicycles = async () => {
@@ -32,39 +29,6 @@ export default function Mapa() {
 
     fetchBicycles();
   }, []);
-
-  const fetchToken = async (bike) => {
-    if (!bike) return;
-    try {
-      const response = await fetch(`/api/token/${bike.imei}`);
-      const data = await response.json();
-      setUnlockToken(data.token);
-      updateTimer(data.expirationTime);
-    } catch (error) {
-      console.error("Error al obtener el token:", error);
-      setMessage("Error al obtener el token.");
-    }
-  };
-
-  const updateTimer = (expirationTime) => {
-    if (timerInterval) clearInterval(timerInterval);
-
-    const interval = setInterval(() => {
-      const now = Date.now();
-      const remainingTime = Math.max(0, expirationTime - now);
-
-      if (remainingTime <= 0) {
-        clearInterval(interval);
-        setTimerText("Token expirado.");
-        return;
-      }
-
-      const secondsLeft = Math.floor(remainingTime / 1000);
-      setTimerText(`Tiempo restante: ${secondsLeft}s`);
-    }, 1000);
-
-    setTimerInterval(interval);
-  };
 
   const handleUnlock = async () => {
     if (!selectedBike || !unlockToken) {
@@ -91,7 +55,11 @@ export default function Mapa() {
 
   return (
     <div id="mapa">
-      <MapContainer center={defaultPosition} zoom={15}>
+      <MapContainer
+        center={defaultPosition}
+        zoom={15}
+        style={{ height: "70vh", width: "100%" }}
+      >
         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
         {bicycles.map((bike) => (
           <Marker
@@ -105,45 +73,26 @@ export default function Mapa() {
               <strong>{bike.deviceName || "Sin nombre"}</strong>
               <br />
               Batería: {bike.batteryPowerVal}%
-              <br />
-              <button
-                onClick={() => fetchToken(bike)}
-                style={{
-                  padding: "5px 10px",
-                  backgroundColor: "#28a745",
-                  color: "#fff",
-                  border: "none",
-                  borderRadius: "5px",
-                  cursor: "pointer",
-                  marginTop: "10px",
-                }}
-              >
-                Generar Token
-              </button>
             </Popup>
           </Marker>
         ))}
       </MapContainer>
 
-      <footer
-        style={{
-          marginTop: "20px",
-          padding: "10px",
-          backgroundColor: "#f8f9fa",
-          textAlign: "center",
-          borderTop: "1px solid #ddd",
-        }}
-      >
-        <h4>Ingresar Código de Desbloqueo</h4>
-        <p>{timerText}</p>
+      <div style={{ marginTop: "20px", padding: "10px" }}>
+        <h3>Desbloquear Bicicleta</h3>
+        <p>
+          {selectedBike
+            ? `Bicicleta seleccionada: ${selectedBike.deviceName || "Sin nombre"}`
+            : "Selecciona una bicicleta en el mapa para continuar."}
+        </p>
         <input
           type="text"
           value={unlockToken}
           onChange={(e) => setUnlockToken(e.target.value)}
-          placeholder="Ingresa manualmente el código recibido"
+          placeholder="Ingresa el token de desbloqueo"
           style={{
             padding: "10px",
-            width: "60%",
+            width: "80%",
             marginBottom: "10px",
           }}
         />
@@ -151,17 +100,17 @@ export default function Mapa() {
           onClick={handleUnlock}
           style={{
             padding: "10px",
-            backgroundColor: "#28a745",
+            backgroundColor: "#007bff",
             color: "#fff",
             border: "none",
             borderRadius: "5px",
             cursor: "pointer",
           }}
         >
-          Confirmar Código
+          Desbloquear
         </button>
-        <p style={{ color: "red" }}>{message}</p>
-      </footer>
+        <p style={{ marginTop: "10px", color: "red" }}>{message}</p>
+      </div>
     </div>
   );
 }
