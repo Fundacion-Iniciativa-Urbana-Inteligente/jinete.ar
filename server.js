@@ -1,4 +1,3 @@
-import admin from 'firebase-admin'; //Importa Base de datos
 import dotenv from 'dotenv';
 import express from 'express';
 import path from 'path';
@@ -10,6 +9,11 @@ import crypto from 'crypto'; // Para hashear la contraseña a MD5
 import axios from 'axios'; // Añadido para las consultas a Jimi IoT
 import fs from 'fs';
 import twilio from 'twilio';
+import { SecretManagerServiceClient } from '@google-cloud/secret-manager';
+import admin from 'firebase-admin';
+import OpenAI from "openai";
+import { sendMessage } from './services/twilioService.js';
+
 
 let currentAccessToken = null;
 let currentRefreshToken = null;
@@ -19,15 +23,6 @@ let currentRefreshToken = null;
 if (process.env.NODE_ENV !== 'production') {
   dotenv.config();
 }
-
-//Configuracion de serviceAccountKey.json
-if (process.env.SERVICE_ACCOUNT_KEY) {
-  serviceAccount = JSON.parse(process.env.SERVICE_ACCOUNT_KEY);
-} else {
-  console.error('No se pudo cargar el archivo serviceAccountKey.json o la variable de entorno SERVICE_ACCOUNT_KEY. Verifica la configuración.');
-  process.exit(1);
-}
-
 
 // Resolver __dirname en módulos ES
 const __filename = fileURLToPath(import.meta.url);
@@ -60,72 +55,51 @@ const JIMI_URL = process.env.JIMI_URL;
 
 let serviceAccount;
 
-// Intenta cargar las credenciales desde la variable de entorno
-if (process.env.SERVICE_ACCOUNT_KEY) {
-  serviceAccount = JSON.parse(process.env.SERVICE_ACCOUNT_KEY);
-} else {
-  // Si no existe la variable de entorno, intenta cargar el archivo local
-  try {
+
+// Levanta el ServiceAccontKey.json
+async function loadServiceAccount() {
+  if (process.env.K_SERVICE) {
+    // Si está en Google Cloud Run
+    try {
+      console.log('Detectado entorno en Google Cloud Run. Intentando cargar el secreto...');
+      const client = new SecretManagerServiceClient();
+      const [version] = await client.accessSecretVersion({
+        name: 'projects/YOUR_PROJECT_ID/secrets/service-account-key/versions/latest',
+      });
+      const payload = version.payload.data.toString('utf8');
+      serviceAccount = JSON.parse(payload);
+      console.log('Credenciales cargadas desde Google Secret Manager.');
+    } catch (error) {
+      console.error('Error al cargar el Service Account desde Secret Manager:', error.message);
+      process.exit(1);
+    }
+  } else {
+    // Si está en local
+    try {
+      console.log('Detectado entorno local. Cargando credenciales desde archivo...');
       serviceAccount = JSON.parse(fs.readFileSync('./serviceAccountKey.json', 'utf8'));
-  } catch (error) {
-      console.error('No se pudo cargar el archivo serviceAccountKey.json o la variable de entorno SERVICE_ACCOUNT_KEY. Verifica la configuración.');
-      process.exit(1); // Finaliza el proceso si no se pueden cargar las credenciales
+      console.log('Credenciales cargadas desde archivo local.');
+    } catch (error) {
+      console.error('No se pudo cargar el archivo serviceAccountKey.json:', error.message);
+      process.exit(1);
+    }
   }
+
+  // Inicializar Firebase Admin SDK
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+    databaseURL: 'https://jinete-ar.firebaseio.com',
+  });
+  console.log('Firebase Admin SDK inicializado correctamente.');
+
+  // Asignar Firestore a db
+  global.db = admin.firestore(); // Usa `global` para compartir `db` en todo el archivo
+  console.log('Firestore inicializado correctamente.');
 }
 
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-  databaseURL: 'https://jinete-ar.firebaseio.com', // Reemplaza con tu URL de Firebase
-});
 
-const db = admin.firestore(); // Instancia de Firestore
-
-console.log('Firebase Admin SDK inicializado correctamente.');
-
-// Ruta para manejar los mensajes entrantes de WhatsApp
-app.post('/webhook/whatsapp', async (req, res) => {
-  const { Body, From } = req.body; // El contenido del mensaje y el número del usuario
-  console.log(`Mensaje recibido de ${From}: ${Body}`);
-
-  try {
-    // Extraer el texto enviado por el usuario
-    const userMessage = Body.toLowerCase();
-
-    // Verificar si el mensaje contiene "reservar la bicicleta"
-    if (userMessage.includes('reservar la bicicleta')) {
-      // Generar un token único
-      const token = Math.floor(1000 + Math.random() * 9000); // Genera un token de 4 dígitos
-      const expirationTime = Date.now() + 180 * 1000; // 180 segundos de validez
-
-      // Guardar el token en Firestore asociado al número de WhatsApp
-      await db.collection('whatsappTokens').doc(From).set({
-        token: token.toString(),
-        expirationTime,
-      });
-
-      // Responder al usuario con el token
-      await twilioClient.messages.create({
-        body: `¡Hola! Tu token para reservar la bicicleta es: ${token}. Validez: 3 minutos.`,
-        from: 'whatsapp:+14155238886', // Número de WhatsApp de Twilio
-        to: From,
-      });
-
-      return res.status(200).send('Token enviado al usuario.');
-    } else {
-      // Respuesta para mensajes no reconocidos
-      await twilioClient.messages.create({
-        body: 'Lo siento, no entendí tu mensaje. Por favor escribe "reservar la bicicleta".',
-        from: 'whatsapp:+14155238886', // Número de WhatsApp de Twilio
-        to: From,
-      });
-
-      return res.status(200).send('Mensaje no reconocido enviado al usuario.');
-    }
-  } catch (error) {
-    console.error('Error al manejar el mensaje de WhatsApp:', error.message);
-    res.status(500).json({ message: 'Error al procesar el mensaje de WhatsApp.' });
-  }
-});
+// Llamar a la función de carga de credenciales
+loadServiceAccount();
 
 // Middleware global
 app.use(cors({
@@ -563,6 +537,84 @@ app.get('/api/token/:imei', async (req, res) => {
   }
 });
 
+// Configuración de OpenAI
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+app.post("/chatbot", async (req, res) => {
+  try {
+    const { message } = req.body;
+    if (!message) {
+      return res.status(400).json({ message: "El mensaje es requerido." });
+    }
+
+    const stream = await openai.chat.completions.create({
+      model: "gpt-4o", // Puedes usar "gpt-4o-mini" si prefieres
+      messages: [{ role: "user", content: message }],
+      stream: true, // ⚡ Streaming activado
+    });
+
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+
+    for await (const chunk of stream) {
+      res.write(chunk.choices[0]?.delta?.content || "");
+    }
+
+    res.end();
+  } catch (error) {
+    console.error("❌ Error en OpenAI:", error.message);
+    res.status(500).json({ message: "Error en la comunicación con OpenAI." });
+  }
+});
+
+
+// Configuracion twilio
+
+
+// Usar la función en una ruta
+app.post('/api/send-message', async (req, res) => {
+  const { body, to } = req.body;
+
+  if (!body || !to) {
+    return res.status(400).json({ message: 'Faltan parámetros requeridos: body o to.' });
+  }
+
+  try {
+    await sendMessage(body, to);
+    res.status(200).json({ message: 'Mensaje enviado correctamente.' });
+  } catch (error) {
+    console.error('Error al enviar el mensaje:', error.message);
+    res.status(500).json({ message: 'Error al enviar el mensaje.' });
+  }
+});
+
+
+// Configuracion de Appcheck
+app.use(async (req, res, next) => {
+  const appCheckToken = req.header("X-Firebase-AppCheck");
+
+  if (!appCheckToken) {
+    return res.status(401).send("App Check token missing");
+  }
+
+  try {
+    // Verifica el token de App Check
+    const appCheckClaims = await admin.appCheck().verifyToken(appCheckToken);
+    console.log("App Check token verified:", appCheckClaims);
+    next(); // Continúa con la solicitud
+  } catch (error) {
+    console.error("App Check token invalid:", error);
+    res.status(403).send("Unauthorized");
+  }
+});
+
+// Define tus rutas
+app.get("/protected-resource", (req, res) => {
+  res.send("Acceso autorizado a App Check");
+});
 
 
 

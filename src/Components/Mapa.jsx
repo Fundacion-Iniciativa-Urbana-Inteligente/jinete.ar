@@ -3,28 +3,30 @@ import { MapContainer, Marker, Popup, TileLayer } from "react-leaflet";
 import axios from "axios";
 import "./Mapa.css";
 
-const defaultPosition = [-27.366666666667, -55.893];
+const defaultPosition = [-27.3653656, -55.8887637];
 
 export default function Mapa() {
   const [bicycles, setBicycles] = useState([]);
   const [selectedBike, setSelectedBike] = useState(null);
   const [unlockToken, setUnlockToken] = useState("");
   const [message, setMessage] = useState("");
-  const [timerText, setTimerText] = useState("Token no generado.");
-  const [timerInterval, setTimerInterval] = useState(null);
+  const [userName, setUserName] = useState(""); // Nombre del usuario autenticado
+  const twilioPhoneNumber = "YOUR_TWILIO_PHONE_NUMBER"; // Reemplaza con tu número de Twilio
+
+  // Recuperar usuario desde localStorage
+  useEffect(() => {
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      const user = JSON.parse(storedUser);
+      setUserName(user.name);
+    }
+  }, []);
 
   useEffect(() => {
     const fetchBicycles = async () => {
       try {
-        const response = await axios.get("/api/bicycles");
-        const validBicycles = response.data.filter(
-          (bike) =>
-            bike.lat !== undefined &&
-            bike.lng !== undefined &&
-            !isNaN(bike.lat) &&
-            !isNaN(bike.lng)
-        );
-        setBicycles(validBicycles);
+        const response = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/bicycles`);
+        setBicycles(response.data);
       } catch (error) {
         console.error("Error al obtener bicicletas:", error);
       }
@@ -33,39 +35,6 @@ export default function Mapa() {
     fetchBicycles();
   }, []);
 
-  const fetchToken = async (bike) => {
-    if (!bike) return;
-    try {
-      const response = await fetch(`/api/token/${bike.imei}`);
-      const data = await response.json();
-      setUnlockToken(data.token);
-      updateTimer(data.expirationTime);
-    } catch (error) {
-      console.error("Error al obtener el token:", error);
-      setMessage("Error al obtener el token.");
-    }
-  };
-
-  const updateTimer = (expirationTime) => {
-    if (timerInterval) clearInterval(timerInterval);
-
-    const interval = setInterval(() => {
-      const now = Date.now();
-      const remainingTime = Math.max(0, expirationTime - now);
-
-      if (remainingTime <= 0) {
-        clearInterval(interval);
-        setTimerText("Token expirado.");
-        return;
-      }
-
-      const secondsLeft = Math.floor(remainingTime / 1000);
-      setTimerText(`Tiempo restante: ${secondsLeft}s`);
-    }, 1000);
-
-    setTimerInterval(interval);
-  };
-
   const handleUnlock = async () => {
     if (!selectedBike || !unlockToken) {
       setMessage("Por favor selecciona una bicicleta e ingresa el token.");
@@ -73,7 +42,7 @@ export default function Mapa() {
     }
 
     try {
-      const response = await axios.post("/api/unlock", {
+      const response = await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/unlock`, {
         imei: selectedBike.imei,
         enteredToken: unlockToken,
       });
@@ -107,10 +76,12 @@ export default function Mapa() {
               Batería: {bike.batteryPowerVal}%
               <br />
               <button
-                onClick={() => fetchToken(bike)}
+                onClick={() =>
+                  (window.location.href = `https://wa.me/+14155238886?text=Hola, Soy ${userName}, quiero reservar la bicicleta ${bike.deviceName}`)
+                }
                 style={{
                   padding: "5px 10px",
-                  backgroundColor: "#28a745",
+                  backgroundColor: "#25D366",
                   color: "#fff",
                   border: "none",
                   borderRadius: "5px",
@@ -118,13 +89,12 @@ export default function Mapa() {
                   marginTop: "10px",
                 }}
               >
-                Generar Token
+                <i className="bi bi-whatsapp"></i> Reservar Bicicleta
               </button>
             </Popup>
           </Marker>
         ))}
       </MapContainer>
-
       <footer
         style={{
           marginTop: "20px",
@@ -135,7 +105,6 @@ export default function Mapa() {
         }}
       >
         <h4>Ingresar Código de Desbloqueo</h4>
-        <p>{timerText}</p>
         <input
           type="text"
           value={unlockToken}
